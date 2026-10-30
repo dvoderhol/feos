@@ -47,6 +47,7 @@ default = []
 dft = ["feos/dft", "feos-dft", "petgraph"]
 pcsaft = ["feos/pcsaft"]
 epcsaft = ["feos/epcsaft"]
+epcpsaft = ["feos/epcpsaft"]
 gc_pcsaft = ["feos/gc_pcsaft"]
 uvtheory = ["feos/uvtheory"]
 pets = ["feos/pets"]
@@ -57,12 +58,13 @@ multiparameter = ["feos/multiparameter"]
 rayon = ["dep:rayon", "ndarray/rayon", "feos-core/rayon", "feos-dft?/rayon"]
 # Loading parameters from a sqlite database. Not active for emscripten wheel.
 sqlite = ["feos-core/rusqlite"]
-ad = ["feos/pcsaft"]
+ad = ["feos/pcsaft", "feos/epcpsaft"]
 # EoS and DFT model implementations.
 all_models = [
     "dft",
     "pcsaft",
     "epcsaft",
+    "epcpsaft",
     "gc_pcsaft",
     "uvtheory",
     "pets",

@@ -1,0 +1,6 @@
+# derived from licensed DDB data: never commit
+results/
+*.csv
+*.png
+*.pdf
+# executed notebooks are written to results/ (see README); notebooks are committed without outputs

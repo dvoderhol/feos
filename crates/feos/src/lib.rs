@@ -42,6 +42,8 @@ pub mod association;
 pub mod hard_sphere;
 
 // models
+#[cfg(feature = "epcpsaft")]
+pub mod epcpsaft;
 #[cfg(feature = "epcsaft")]
 pub mod epcsaft;
 #[cfg(feature = "gc_pcsaft")]

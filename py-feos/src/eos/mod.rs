@@ -13,6 +13,8 @@ use std::sync::Arc;
 type Quot<T1, T2> = <T1 as Div<T2>>::Output;
 
 mod constructors;
+#[cfg(feature = "epcpsaft")]
+mod epcpsaft;
 #[cfg(feature = "epcsaft")]
 mod epcsaft;
 #[cfg(feature = "gc_pcsaft")]

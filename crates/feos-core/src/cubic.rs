@@ -231,4 +231,28 @@ mod tests {
         );
         Ok(())
     }
+
+    #[test]
+    fn residual_chemical_potential_contributions() -> FeosResult<()> {
+        let parameters = PengRobinsonParameters::new(pure_record_vec(), vec![])?;
+        let pr = PengRobinson::new(parameters);
+        let state = State::new_npt(
+            &&pr,
+            300.0 * KELVIN,
+            20.0 * quantity::BAR,
+            &nalgebra::dvector![0.3, 0.7] * quantity::MOL,
+            None,
+        )?;
+        let mu = state.residual_chemical_potential();
+        for i in 0..2 {
+            let sum = state
+                .residual_chemical_potential_contributions(i)
+                .into_iter()
+                .fold(0.0 * quantity::JOULE / quantity::MOL, |acc, (_, mu_i)| {
+                    acc + mu_i
+                });
+            assert_relative_eq!(sum, mu.get(i), max_relative = 1e-12);
+        }
+        Ok(())
+    }
 }
