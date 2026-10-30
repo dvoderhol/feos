@@ -26,7 +26,10 @@ jupyter nbconvert --execute --to notebook --output-dir results 01_water_permitti
 
 ## Procedure (Rueben et al. 2024a, section 3.1)
 
-- Data: phase "Liquid", frequency < 1000 Hz or not given, p < 5 bar or not given; points at T >= T_c of the model are excluded.
+- Data: phase "Liquid", frequency < 1000 Hz or not given, p < 5 bar or not given (`--max-pressure` changes or removes the
+  limit; errors are always reported separately for points below and above 5 bar); points at T >= T_c of the model are
+  excluded; the points in `permittivity.EXCLUDED` are removed (MEA, 258.15 and 263.15 K: eps of a solid, decision 2026-10-30).
+- Substances with fewer than 5 points and no dipole moment (25) are not fitted; piperazine is not in Esper et al. (2023).
 - Density: ePCP-SAFT liquid density at the given pressure, else at p = max(1 bar, psat of the model).
 - Loss: Huber with delta = 5 % of the mean permittivity for n >= 5, least squares otherwise.
 - Schemes: NP (a12alpha), P (a11mu2, a2), All. Water: P (prescribed). n >= 5: NP or P by the lower MAD, then All if its AICc is lower.

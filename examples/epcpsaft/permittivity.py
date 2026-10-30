@@ -55,10 +55,23 @@ def ddb(path=None):
     return pd.read_csv(path, sep="\t", low_memory=False, usecols=cols)
 
 
-def rueben_filter(df):
-    """Rueben et al. (2024a): liquid phase, p < 5 bar or not given, frequency < 1000 Hz or not given"""
+# data points removed by decision: (CAS, temperature [K], value, reason)
+EXCLUDED = [
+    ("141-43-5", 258.15, 3.368, "MEA, Lafontaine 1958: 'Liquid' below the melting point (283.5 K), eps of a solid"),
+    ("141-43-5", 263.15, 3.475, "MEA, Lafontaine 1958: 'Liquid' below the melting point (283.5 K), eps of a solid"),
+]
+
+
+def rueben_filter(df, max_pressure=5e5):
+    """Rueben et al. (2024a): liquid phase, p < 5 bar or not given, frequency < 1000 Hz or not given;
+    max_pressure=None: no pressure limit. Points in EXCLUDED are removed."""
     frequency_ok = (df.const_prop == "Frequency [Hz]") & (df.const_value < 1000) | df.const_value.isna()
-    return df[(df.phase == "Liquid") & frequency_ok & ((df.pressure < 5e5) | df.pressure.isna())]
+    keep = (df.phase == "Liquid") & frequency_ok
+    if max_pressure is not None:
+        keep &= (df.pressure < max_pressure) | df.pressure.isna()
+    for cas, T, value, _ in EXCLUDED:
+        keep &= ~((df.cas == cas) & np.isclose(df.temperature, T) & np.isclose(df.value, value))
+    return df[keep]
 
 
 def substance_data(df, cas):

@@ -10,7 +10,11 @@ pub(crate) mod parameters;
 
 #[cfg(feature = "dft")]
 pub use dft::{EPcpSaftFunctional, EPcpSaftFunctionalContribution};
-pub use eos::{DQVariants, EPcpSaft, EPcpSaftBinary, EPcpSaftOptions, EPcpSaftPure};
+pub use eos::{
+    DQVariants, EPcpSaft, EPcpSaftAD, EPcpSaftBinary, EPcpSaftOptions, EPcpSaftParameter,
+    EPcpSaftPure,
+};
+pub use parameters::EPcpSaftPars;
 pub use parameters::{
     EPcpSaftAssociationRecord, EPcpSaftBinaryRecord, EPcpSaftParameters, EPcpSaftRecord,
     PermittivityRecord,

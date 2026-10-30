@@ -1,5 +1,4 @@
 use super::EPcpSaftPars;
-use crate::hard_sphere::HardSphereProperties;
 use feos_core::StateHD;
 use nalgebra::DMatrix;
 use num_dual::DualNum;
@@ -78,11 +77,16 @@ pub const CDQ: [[f64; 2]; 3] = [
 
 pub const PI_SQ_43: f64 = 4.0 * PI * FRAC_PI_3;
 
-pub struct MeanSegmentNumbers {
-    pub mij1: DMatrix<f64>,
-    pub mij2: DMatrix<f64>,
-    pub mijk1: Vec<DMatrix<f64>>,
-    pub mijk2: Vec<DMatrix<f64>>,
+pub struct MeanSegmentNumbers<D> {
+    pub mij1: DMatrix<D>,
+    pub mij2: DMatrix<D>,
+    pub mijk1: Vec<DMatrix<D>>,
+    pub mijk2: Vec<DMatrix<D>>,
+}
+
+/// min(m, 2) of the polar terms
+fn min2<D: DualNum<f64> + Copy>(m: D) -> D {
+    if m.re() > 2.0 { D::from(2.0) } else { m }
 }
 
 pub enum Multipole {
@@ -90,8 +94,8 @@ pub enum Multipole {
     Quadrupole,
 }
 
-impl MeanSegmentNumbers {
-    pub fn new(parameters: &EPcpSaftPars, polarity: Multipole) -> Self {
+impl<D: DualNum<f64> + Copy> MeanSegmentNumbers<D> {
+    pub fn new(parameters: &EPcpSaftPars<D>, polarity: Multipole) -> Self {
         let (npoles, comp) = match polarity {
             Multipole::Dipole => (parameters.ndipole, &parameters.dipole_comp),
             Multipole::Quadrupole => (parameters.nquadpole, &parameters.quadpole_comp),
@@ -102,14 +106,14 @@ impl MeanSegmentNumbers {
         let mut mijk1 = vec![DMatrix::zeros(npoles, npoles); npoles];
         let mut mijk2 = vec![DMatrix::zeros(npoles, npoles); npoles];
         for i in 0..npoles {
-            let mi = parameters.m[comp[i]].min(2.0);
+            let mi = min2(parameters.m[comp[i]]);
             for j in i..npoles {
-                let mj = parameters.m[comp[j]].min(2.0);
+                let mj = min2(parameters.m[comp[j]]);
                 let mij = (mi * mj).sqrt();
                 mij1[(i, j)] = (mij - 1.0) / mij;
                 mij2[(i, j)] = mij1[(i, j)] * (mij - 2.0) / mij;
                 for k in j..npoles {
-                    let mk = parameters.m[comp[k]].min(2.0);
+                    let mk = min2(parameters.m[comp[k]]);
                     let mijk = (mi * mj * mk).cbrt();
                     mijk1[i][(j, k)] = (mijk - 1.0) / mijk;
                     mijk2[i][(j, k)] = mijk1[i][(j, k)] * (mijk - 2.0) / mijk;
@@ -126,8 +130,8 @@ impl MeanSegmentNumbers {
 }
 
 fn pair_integral_ij<D: DualNum<f64> + Copy>(
-    mij1: f64,
-    mij2: f64,
+    mij1: D,
+    mij2: D,
     etas: &[D],
     a: &[[f64; 3]],
     b: &[[f64; 3]],
@@ -136,26 +140,26 @@ fn pair_integral_ij<D: DualNum<f64> + Copy>(
     (0..a.len())
         .map(|i| {
             etas[i]
-                * (eps_ij_t * (b[i][0] + mij1 * b[i][1] + mij2 * b[i][2])
-                    + (a[i][0] + mij1 * a[i][1] + mij2 * a[i][2]))
+                * (eps_ij_t * (mij1 * b[i][1] + b[i][0] + mij2 * b[i][2])
+                    + (mij1 * a[i][1] + a[i][0] + mij2 * a[i][2]))
         })
         .sum()
 }
 
 fn triplet_integral_ijk<D: DualNum<f64> + Copy>(
-    mijk1: f64,
-    mijk2: f64,
+    mijk1: D,
+    mijk2: D,
     etas: &[D],
     c: &[[f64; 3]],
 ) -> D {
     (0..c.len())
-        .map(|i| etas[i] * (c[i][0] + mijk1 * c[i][1] + mijk2 * c[i][2]))
+        .map(|i| etas[i] * (mijk1 * c[i][1] + c[i][0] + mijk2 * c[i][2]))
         .sum()
 }
 
-fn triplet_integral_ijk_dq<D: DualNum<f64> + Copy>(mijk: f64, etas: &[D], c: &[[f64; 2]]) -> D {
+fn triplet_integral_ijk_dq<D: DualNum<f64> + Copy>(mijk: D, etas: &[D], c: &[[f64; 2]]) -> D {
     (0..c.len())
-        .map(|i| etas[i] * (c[i][0] + mijk * c[i][1]))
+        .map(|i| etas[i] * (mijk * c[i][1] + c[i][0]))
         .sum()
 }
 
@@ -165,7 +169,7 @@ impl Dipole {
     #[inline]
     pub fn helmholtz_energy_density<D: DualNum<f64> + Copy>(
         &self,
-        parameters: &EPcpSaftPars,
+        parameters: &EPcpSaftPars<D>,
         state: &StateHD<D>,
     ) -> D {
         let m = MeanSegmentNumbers::new(parameters, Multipole::Dipole);
@@ -181,7 +185,7 @@ impl Dipole {
             .collect();
 
         let rho = &state.partial_density;
-        let [eta] = parameters.zeta(state.temperature, rho, [3]);
+        let [eta] = parameters.packing(state.temperature, rho, [3]);
         let eta2 = eta * eta;
         let etas = [D::one(), eta, eta2, eta2 * eta, eta2 * eta2];
 
@@ -238,7 +242,7 @@ impl Quadrupole {
     #[inline]
     pub fn helmholtz_energy_density<D: DualNum<f64> + Copy>(
         &self,
-        parameters: &EPcpSaftPars,
+        parameters: &EPcpSaftPars<D>,
         state: &StateHD<D>,
     ) -> D {
         let m = MeanSegmentNumbers::new(parameters, Multipole::Quadrupole);
@@ -254,7 +258,7 @@ impl Quadrupole {
             .collect();
 
         let rho = &state.partial_density;
-        let [eta] = parameters.zeta(state.temperature, rho, [3]);
+        let [eta] = parameters.packing(state.temperature, rho, [3]);
         let eta2 = eta * eta;
         let etas = [D::one(), eta, eta2, eta2 * eta, eta2 * eta2];
 
@@ -319,7 +323,7 @@ impl DipoleQuadrupole {
     #[inline]
     pub fn helmholtz_energy_density<D: DualNum<f64> + Copy>(
         &self,
-        parameters: &EPcpSaftPars,
+        parameters: &EPcpSaftPars<D>,
         state: &StateHD<D>,
         variant: DQVariants,
     ) -> D {
@@ -340,7 +344,7 @@ impl DipoleQuadrupole {
             .collect();
 
         let rho = &state.partial_density;
-        let [eta] = parameters.zeta(state.temperature, rho, [3]);
+        let [eta] = parameters.packing(state.temperature, rho, [3]);
         let eta2 = eta * eta;
         let etas = [D::one(), eta, eta2, eta2 * eta, eta2 * eta2];
 
@@ -351,22 +355,22 @@ impl DipoleQuadrupole {
         let mut mdqq = vec![DMatrix::zeros(p.nquadpole, p.nquadpole); p.ndipole];
         for i in 0..p.ndipole {
             let di = p.dipole_comp[i];
-            let mi = p.m[di].min(2.0);
+            let mi = min2(p.m[di]);
             for j in 0..p.nquadpole {
                 let qj = p.quadpole_comp[j];
-                let mj = p.m[qj].min(2.0);
+                let mj = min2(p.m[qj]);
                 let m = (mi * mj).sqrt();
                 mdq1[(i, j)] = (m - 1.0) / m;
                 mdq2[(i, j)] = mdq1[(i, j)] * (m - 2.0) / m;
                 for k in 0..p.ndipole {
                     let dk = p.dipole_comp[k];
-                    let mk = p.m[dk].min(2.0);
+                    let mk = min2(p.m[dk]);
                     let m = (mi * mj * mk).cbrt();
                     mdqd[i][(j, k)] = (m - 1.0) / m;
                 }
                 for k in 0..p.nquadpole {
                     let qk = p.quadpole_comp[k];
-                    let mk = p.m[qk].min(2.0);
+                    let mk = min2(p.m[qk]);
                     let m = (mi * mj * mk).cbrt();
                     mdqq[i][(j, k)] = (m - 1.0) / m;
                 }

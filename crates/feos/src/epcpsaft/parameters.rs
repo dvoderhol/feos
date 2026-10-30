@@ -1,6 +1,7 @@
 use feos_core::parameter::{CombiningRule, FromSegments, FromSegmentsBinary, Parameters};
 use feos_core::{FeosError, FeosResult};
 use nalgebra::{DMatrix, DVector};
+use num_dual::DualNum;
 use num_traits::Zero;
 use quantity::{JOULE, KB, KELVIN};
 use serde::{Deserialize, Serialize};
@@ -235,15 +236,30 @@ pub type EPcpSaftParameters =
     Parameters<EPcpSaftRecord, EPcpSaftBinaryRecord, EPcpSaftAssociationRecord>;
 
 /// The ePCP-SAFT parameters in an easier accessible format.
-pub struct EPcpSaftPars {
-    pub m: DVector<f64>,
-    pub sigma: DVector<f64>,
-    pub epsilon_k: DVector<f64>,
-    pub mu2: DVector<f64>,
-    pub q2: DVector<f64>,
-    pub sigma_ij: DMatrix<f64>,
-    pub epsilon_k_ij: DMatrix<f64>,
-    pub e_k_ij: DMatrix<f64>,
+///
+/// All model parameters are of the generic type `D` (`f64` or a dual number for derivatives
+/// with respect to model parameters). `m` to `born_delta` are the adjustable parameters,
+/// `mu2` to `e_k_ij` are derived from them, the remaining fields describe the structure.
+#[derive(Clone, Debug)]
+pub struct EPcpSaftPars<D = f64> {
+    pub m: DVector<D>,
+    pub sigma: DVector<D>,
+    pub epsilon_k: DVector<D>,
+    /// dipole moment in Debye
+    pub mu: DVector<D>,
+    /// quadrupole moment in Debye Angstrom
+    pub q: DVector<D>,
+    pub k_ij: DMatrix<D>,
+    /// (dipole_scaling, polarizability_scaling, correlation_integral_parameter) of all components;
+    /// `None` if at least one component has no permittivity record.
+    pub permittivity: Option<[DVector<D>; 3]>,
+    /// correction of the Born diameter of all cations and all anions in Angstrom
+    pub born_delta: [D; 2],
+    pub mu2: DVector<D>,
+    pub q2: DVector<D>,
+    pub sigma_ij: DMatrix<D>,
+    pub epsilon_k_ij: DMatrix<D>,
+    pub e_k_ij: DMatrix<D>,
     pub ndipole: usize,
     pub nquadpole: usize,
     pub dipole_comp: Vec<usize>,
@@ -251,9 +267,6 @@ pub struct EPcpSaftPars {
     pub z: DVector<f64>,
     pub nionic: usize,
     pub ionic_comp: Vec<usize>,
-    /// (dipole_scaling, polarizability_scaling, correlation_integral_parameter) of all components;
-    /// `None` if at least one component has no permittivity record.
-    pub permittivity: Option<[DVector<f64>; 3]>,
     pub viscosity: Option<DMatrix<f64>>,
     pub diffusion: Option<DMatrix<f64>>,
     pub thermal_conductivity: Option<DMatrix<f64>>,
@@ -263,25 +276,16 @@ impl EPcpSaftPars {
     pub fn new(parameters: &EPcpSaftParameters) -> FeosResult<Self> {
         let n = parameters.pure.len();
 
-        let [m, sigma, epsilon_k, z] =
-            parameters.collate(|pr| [pr.m, pr.sigma, pr.epsilon_k, pr.z]);
+        let [m, sigma, epsilon_k, mu, q, z] =
+            parameters.collate(|pr| [pr.m, pr.sigma, pr.epsilon_k, pr.mu, pr.q, pr.z]);
         let [viscosity, thermal_conductivity] =
             parameters.collate(|pr| [pr.viscosity, pr.thermal_conductivity]);
         let [diffusion] = parameters.collate(|pr| [pr.diffusion]);
-        let [mut k_ij] = parameters.collate_binary(|br| [br.k_ij]);
+        let [k_ij] = parameters.collate_binary(|br| [br.k_ij]);
 
         // ions
         let ionic_comp: Vec<usize> = (0..n).filter(|&i| z[i] != 0.0).collect();
         let nionic = ionic_comp.len();
-
-        // no dispersion between ions of the same charge sign (Held et al. 2014)
-        for &i in &ionic_comp {
-            for &j in &ionic_comp {
-                if z[i] * z[j] > 0.0 {
-                    k_ij[(i, j)] = 1.0;
-                }
-            }
-        }
 
         // permittivity
         let permittivity = parameters
@@ -311,93 +315,150 @@ impl EPcpSaftPars {
             ));
         }
 
-        let [mu2, q2] = parameters.collate(|pr| {
-            [
-                pr.mu * pr.mu / (pr.m * pr.sigma.powi(3) * pr.epsilon_k)
-                    * 1e-19
-                    * (JOULE / KELVIN / KB).into_value(),
-                pr.q * pr.q / (pr.m * pr.sigma.powi(5) * pr.epsilon_k)
-                    * 1e-19
-                    * (JOULE / KELVIN / KB).into_value(),
-            ]
-        });
-        let dipole_comp: Vec<usize> = mu2
-            .iter()
-            .enumerate()
-            .filter_map(|(i, &mu2)| (mu2.abs() > 0.0).then_some(i))
-            .collect();
+        let dipole_comp: Vec<usize> = (0..n).filter(|&i| mu[i] != 0.0).collect();
         let ndipole = dipole_comp.len();
-        let quadpole_comp: Vec<usize> = q2
-            .iter()
-            .enumerate()
-            .filter_map(|(i, &q2)| (q2.abs() > 0.0).then_some(i))
-            .collect();
+        let quadpole_comp: Vec<usize> = (0..n).filter(|&i| q[i] != 0.0).collect();
         let nquadpole = quadpole_comp.len();
 
-        let mut sigma_ij = DMatrix::zeros(n, n);
-        let mut e_k_ij = DMatrix::zeros(n, n);
-        for i in 0..n {
-            for j in 0..n {
-                e_k_ij[(i, j)] = (epsilon_k[i] * epsilon_k[j]).sqrt();
-                sigma_ij[(i, j)] = 0.5 * (sigma[i] + sigma[j]);
+        let collect = |coefficients: Vec<Option<Vec<f64>>>, rows: usize| {
+            if coefficients.iter().any(|v| v.is_none()) {
+                None
+            } else {
+                let mut v = DMatrix::zeros(rows, coefficients.len());
+                for (i, vi) in coefficients.into_iter().enumerate() {
+                    v.column_mut(i).add_assign(&DVector::from(vi.unwrap()));
+                }
+                Some(v)
             }
-        }
-        let epsilon_k_ij = (-k_ij).add_scalar(1.0).component_mul(&e_k_ij);
-
-        let viscosity = if viscosity.iter().any(|v| v.is_none()) {
-            None
-        } else {
-            let mut v = DMatrix::zeros(4, viscosity.len());
-            for (i, vi) in viscosity.iter().enumerate() {
-                v.column_mut(i)
-                    .add_assign(&DVector::from(vi.unwrap().to_vec()));
-            }
-            Some(v)
         };
+        let viscosity = collect(viscosity.iter().map(|v| v.map(|v| v.to_vec())).collect(), 4);
+        let diffusion = collect(diffusion.iter().map(|v| v.map(|v| v.to_vec())).collect(), 5);
+        let thermal_conductivity = collect(
+            thermal_conductivity
+                .iter()
+                .map(|v| v.map(|v| v.to_vec()))
+                .collect(),
+            4,
+        );
 
-        let diffusion = if diffusion.iter().any(|v| v.is_none()) {
-            None
-        } else {
-            let mut v = DMatrix::zeros(5, diffusion.len());
-            for (i, vi) in diffusion.iter().enumerate() {
-                v.column_mut(i)
-                    .add_assign(&DVector::from(vi.unwrap().to_vec()));
-            }
-            Some(v)
-        };
-
-        let thermal_conductivity = if thermal_conductivity.iter().any(|v| v.is_none()) {
-            None
-        } else {
-            let mut v = DMatrix::zeros(4, thermal_conductivity.len());
-            for (i, vi) in thermal_conductivity.iter().enumerate() {
-                v.column_mut(i)
-                    .add_assign(&DVector::from(vi.unwrap().to_vec()));
-            }
-            Some(v)
-        };
-
-        Ok(Self {
+        Ok(Self::derive(
             m,
             sigma,
             epsilon_k,
+            mu,
+            q,
+            k_ij,
+            permittivity,
+            [0.0, 0.0],
+            Self {
+                m: DVector::zeros(0),
+                sigma: DVector::zeros(0),
+                epsilon_k: DVector::zeros(0),
+                mu: DVector::zeros(0),
+                q: DVector::zeros(0),
+                k_ij: DMatrix::zeros(0, 0),
+                permittivity: None,
+                born_delta: [0.0; 2],
+                mu2: DVector::zeros(0),
+                q2: DVector::zeros(0),
+                sigma_ij: DMatrix::zeros(0, 0),
+                epsilon_k_ij: DMatrix::zeros(0, 0),
+                e_k_ij: DMatrix::zeros(0, 0),
+                ndipole,
+                nquadpole,
+                dipole_comp,
+                quadpole_comp,
+                z,
+                nionic,
+                ionic_comp,
+                viscosity,
+                diffusion,
+                thermal_conductivity,
+            },
+        ))
+    }
+}
+
+impl<D: DualNum<f64> + Copy> EPcpSaftPars<D> {
+    /// Parameters from the adjustable parameters; the structure is taken from `structure`.
+    #[expect(clippy::too_many_arguments)]
+    fn derive<D0>(
+        m: DVector<D>,
+        sigma: DVector<D>,
+        epsilon_k: DVector<D>,
+        mu: DVector<D>,
+        q: DVector<D>,
+        mut k_ij: DMatrix<D>,
+        permittivity: Option<[DVector<D>; 3]>,
+        born_delta: [D; 2],
+        structure: EPcpSaftPars<D0>,
+    ) -> Self {
+        let n = m.len();
+        let z = &structure.z;
+
+        // no dispersion between ions of the same charge sign (Held et al. 2014)
+        for &i in &structure.ionic_comp {
+            for &j in &structure.ionic_comp {
+                if z[i] * z[j] > 0.0 {
+                    k_ij[(i, j)] = D::one();
+                }
+            }
+        }
+
+        // 1 D^2 = 1e-19 J A^3
+        let factor = (JOULE / KELVIN / KB).into_value();
+        let mu2 = DVector::from_fn(n, |i, _| {
+            mu[i] * mu[i] / (m[i] * sigma[i].powi(3) * epsilon_k[i]) * 1e-19 * factor
+        });
+        let q2 = DVector::from_fn(n, |i, _| {
+            q[i] * q[i] / (m[i] * sigma[i].powi(5) * epsilon_k[i]) * 1e-19 * factor
+        });
+
+        let e_k_ij = DMatrix::from_fn(n, n, |i, j| (epsilon_k[i] * epsilon_k[j]).sqrt());
+        let sigma_ij = DMatrix::from_fn(n, n, |i, j| (sigma[i] + sigma[j]) * 0.5);
+        let epsilon_k_ij = DMatrix::from_fn(n, n, |i, j| (-k_ij[(i, j)] + 1.0) * e_k_ij[(i, j)]);
+
+        Self {
+            m,
+            sigma,
+            epsilon_k,
+            mu,
+            q,
+            k_ij,
+            permittivity,
+            born_delta,
             mu2,
             q2,
             sigma_ij,
             epsilon_k_ij,
             e_k_ij,
-            ndipole,
-            nquadpole,
-            dipole_comp,
-            quadpole_comp,
-            z,
-            nionic,
-            ionic_comp,
-            permittivity,
-            viscosity,
-            diffusion,
-            thermal_conductivity,
-        })
+            ndipole: structure.ndipole,
+            nquadpole: structure.nquadpole,
+            dipole_comp: structure.dipole_comp,
+            quadpole_comp: structure.quadpole_comp,
+            z: structure.z,
+            nionic: structure.nionic,
+            ionic_comp: structure.ionic_comp,
+            viscosity: structure.viscosity,
+            diffusion: structure.diffusion,
+            thermal_conductivity: structure.thermal_conductivity,
+        }
+    }
+
+    /// Parameters with all adjustable parameters mapped by `f`; derived parameters are recomputed.
+    pub fn map<D2: DualNum<f64> + Copy>(&self, f: impl Fn(D) -> D2) -> EPcpSaftPars<D2> {
+        let v = |x: &DVector<D>| x.map(&f);
+        EPcpSaftPars::derive(
+            v(&self.m),
+            v(&self.sigma),
+            v(&self.epsilon_k),
+            v(&self.mu),
+            v(&self.q),
+            self.k_ij.map(&f),
+            self.permittivity.as_ref().map(|p| p.each_ref().map(v)),
+            self.born_delta.map(&f),
+            self.clone(),
+        )
     }
 }
 

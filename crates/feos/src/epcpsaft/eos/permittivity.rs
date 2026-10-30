@@ -9,14 +9,14 @@ pub fn epsilon_0() -> f64 {
     (EPSILON0 / (FARAD / METER)).into_value()
 }
 
-impl EPcpSaftPars {
+impl<D: DualNum<f64> + Copy> EPcpSaftPars<D> {
     /// Relative permittivity of the mixture (Rueben et al. 2024, perturbation theory of Neumaier et al. 2022).
     ///
     /// eps_r = 1 + 3y [1 + y + (17/16 I - 1) y^2],  I = 1 + a2 (exp(-y) - 1),
     /// y = 4 pi / 9 sum_i rho_i [(a11 mu^2)_i / (kB T) + 3 (a12 alpha)_i],  a2 = sum_i x_i a2_i.
     ///
     /// Returns `None` if at least one component has no permittivity record.
-    pub fn permittivity<D: DualNum<f64> + Copy>(&self, state: &StateHD<D>) -> Option<D> {
+    pub fn permittivity(&self, state: &StateHD<D>) -> Option<D> {
         let [
             dipole_scaling,
             polarizability_scaling,
@@ -40,7 +40,7 @@ impl EPcpSaftPars {
     }
 
     /// Bjerrum length e^2 / (4 pi eps_0 eps_r kB T) in units of Angstrom.
-    pub fn bjerrum_length<D: DualNum<f64> + Copy>(&self, temperature: D, permittivity: D) -> D {
+    pub fn bjerrum_length(&self, temperature: D, permittivity: D) -> D {
         let qe = (QE / COULOMB).into_value();
         let kb = (KB / (JOULE / KELVIN)).into_value();
         (permittivity * temperature * 4.0 * PI * epsilon_0() * kb).recip() * qe * qe * 1e10

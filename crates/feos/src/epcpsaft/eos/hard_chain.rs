@@ -1,5 +1,4 @@
 use crate::epcpsaft::parameters::EPcpSaftPars;
-use crate::hard_sphere::HardSphereProperties;
 use feos_core::StateHD;
 use num_dual::*;
 
@@ -9,18 +8,18 @@ impl HardChain {
     #[inline]
     pub fn helmholtz_energy_density<D: DualNum<f64> + Copy>(
         &self,
-        parameters: &EPcpSaftPars,
+        parameters: &EPcpSaftPars<D>,
         state: &StateHD<D>,
     ) -> D {
-        let d = parameters.hs_diameter(state.temperature);
-        let [zeta2, zeta3] = parameters.zeta(state.temperature, &state.partial_density, [2, 3]);
+        let d = parameters.diameter(state.temperature);
+        let [zeta2, zeta3] = parameters.packing(state.temperature, &state.partial_density, [2, 3]);
         let frac_1mz3 = -(zeta3 - 1.0).recip();
         let c = zeta2 * frac_1mz3 * frac_1mz3;
         let g_hs = d.map(|d| frac_1mz3 + d * c * 1.5 - d.powi(2) * c.powi(2) * (zeta3 - 1.0) * 0.5);
         state
             .partial_density
             .component_mul(&g_hs.map(|g| g.ln()))
-            .dot(&(-parameters.m.map(|m| D::from(m - 1.0))))
+            .dot(&(-parameters.m.map(|m| m - 1.0)))
     }
 }
 

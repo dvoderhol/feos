@@ -7729,8 +7729,8 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 11.4635,
-                "polarizability_scaling": 38.5691,
+                "dipole_scaling": 11.4634,
+                "polarizability_scaling": 38.5694,
                 "correlation_integral_parameter": 0.1635
             }
         }
@@ -16597,9 +16597,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 12.717,
+                "dipole_scaling": 9.8053,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.2066
+                "correlation_integral_parameter": 0.1553
             }
         }
     },

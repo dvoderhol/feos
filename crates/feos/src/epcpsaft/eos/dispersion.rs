@@ -1,5 +1,4 @@
 use super::EPcpSaftPars;
-use crate::hard_sphere::HardSphereProperties;
 use feos_core::StateHD;
 use num_dual::DualNum;
 use std::f64::consts::PI;
@@ -64,7 +63,7 @@ pub struct Dispersion;
 impl Dispersion {
     pub fn helmholtz_energy_density<D: DualNum<f64> + Copy>(
         &self,
-        parameters: &EPcpSaftPars,
+        parameters: &EPcpSaftPars<D>,
         state: &StateHD<D>,
     ) -> D {
         // auxiliary variables
@@ -73,8 +72,8 @@ impl Dispersion {
         let rho = &state.partial_density;
 
         // packing fraction
-        let m = p.m.map(D::from);
-        let [eta] = parameters.zeta(state.temperature, &state.partial_density, [3]);
+        let m = p.m.clone();
+        let [eta] = parameters.packing(state.temperature, &state.partial_density, [3]);
 
         // mean segment number
         let m = state.molefracs.dot(&m);

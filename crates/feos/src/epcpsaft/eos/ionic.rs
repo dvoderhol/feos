@@ -14,7 +14,7 @@ impl Ionic {
     /// chi_i = 3 / (kappa d_i)^3 [ln(1 + kappa d_i) - 2 (1 + kappa d_i) + (1 + kappa d_i)^2 / 2 + 3 / 2].
     pub fn helmholtz_energy_density<D: DualNum<f64> + Copy>(
         &self,
-        parameters: &EPcpSaftPars,
+        parameters: &EPcpSaftPars<D>,
         state: &StateHD<D>,
         diameter: &DVector<D>,
         bjerrum_length: D,

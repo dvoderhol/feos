@@ -12,7 +12,7 @@ impl Born {
     /// with lambda_B = e^2 / (4 pi eps_0 eps_r kB T), i.e. -e^2 / (4 pi eps_0 kB T) (1 - 1/eps_r) sum_i rho_i z_i^2 / d_Born,i.
     pub fn helmholtz_energy_density<D: DualNum<f64> + Copy>(
         &self,
-        parameters: &EPcpSaftPars,
+        parameters: &EPcpSaftPars<D>,
         state: &StateHD<D>,
         born_diameter: &DVector<D>,
         bjerrum_length: D,
