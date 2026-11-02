@@ -9,7 +9,7 @@ All PCP-SAFT parameters are identical to the files in [`../pcsaft`](../pcsaft). 
 
 | file | description | publication(s) |
 | - | - | :-: |
-| [`esper2023.json`](esper2023.json) | copy of [`../pcsaft/esper2023.json`](../pcsaft/esper2023.json); permittivity parameters added for 747 substances | [&#128279;](https://doi.org/10.1021/acs.iecr.3c02255) |
+| [`esper2023.json`](esper2023.json) | copy of [`../pcsaft/esper2023.json`](../pcsaft/esper2023.json); permittivity parameters added for 753 substances | [&#128279;](https://doi.org/10.1021/acs.iecr.3c02255) |
 
 ## Binary Parameters
 
@@ -19,11 +19,11 @@ All PCP-SAFT parameters are identical to the files in [`../pcsaft`](../pcsaft). 
 
 ## Permittivity Parameters
 
-`permittivity_record` with `PerturbationTheory` parameters ([Rueben et al. 2022](https://doi.org/10.1016/j.fluid.2021.113346), [Rueben et al. 2024a](https://doi.org/10.1021/acs.jced.3c00323)) for 747 substances,
+`permittivity_record` with `PerturbationTheory` parameters ([Rueben et al. 2022](https://doi.org/10.1016/j.fluid.2021.113346), [Rueben et al. 2024a](https://doi.org/10.1021/acs.jced.3c00323)) for 753 substances,
 fitted with the liquid density of the PCP-SAFT parameters of the respective substance by
 [`examples/epcpsaft/fit_solvent_permittivity.py`](../../examples/epcpsaft/fit_solvent_permittivity.py):
-DDB data (all data points after the filter of Rueben et al. 2024a), Huber loss, scheme selection of Rueben et al. (2024a);
-water: scheme P prescribed (`dipole_scaling` 5.194 D², `correlation_integral_parameter` 0.1311).
+DDB data (filter of Rueben et al. 2024a without the pressure limit; experimental data only, duplicates and identical values removed), Huber loss,
+scheme selection of Rueben et al. (2024a); water: scheme P prescribed (`dipole_scaling` 5.2607 D², `correlation_integral_parameter` 0.1320).
 
 ## Ions
 

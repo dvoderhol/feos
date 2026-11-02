@@ -414,7 +414,11 @@ impl<D: DualNum<f64> + Copy> EPcpSaftPars<D> {
             q[i] * q[i] / (m[i] * sigma[i].powi(5) * epsilon_k[i]) * 1e-19 * factor
         });
 
-        let e_k_ij = DMatrix::from_fn(n, n, |i, j| (epsilon_k[i] * epsilon_k[j]).sqrt());
+        // sqrt(0) of a dual number has infinite derivatives (NaN after multiplication with 0)
+        let e_k_ij = DMatrix::from_fn(n, n, |i, j| {
+            let e2 = epsilon_k[i] * epsilon_k[j];
+            if e2.re() == 0.0 { D::zero() } else { e2.sqrt() }
+        });
         let sigma_ij = DMatrix::from_fn(n, n, |i, j| (sigma[i] + sigma[j]) * 0.5);
         let epsilon_k_ij = DMatrix::from_fn(n, n, |i, j| (-k_ij[(i, j)] + 1.0) * e_k_ij[(i, j)]);
 
@@ -759,7 +763,7 @@ pub mod utils {
                 "sigma": 2.15072,
                 "epsilon_k": 230.71557,
                 "association_sites": [{"na": 1.0, "nb": 1.0, "kappa_ab": 0.35319, "epsilon_k_ab": 2195.10176}],
-                "permittivity_record": {"PerturbationTheory": {"dipole_scaling": 5.194, "polarizability_scaling": 0.0, "correlation_integral_parameter": 0.1311}}
+                "permittivity_record": {"PerturbationTheory": {"dipole_scaling": 5.2607, "polarizability_scaling": 0.0, "correlation_integral_parameter": 0.1320}}
             },
             {
                 "identifier": {"name": "sodium ion"},

@@ -1,7 +1,8 @@
 """Permittivity parameters for all substances of parameters/epcpsaft/esper2023.json with DDB permittivity data.
 
-usage: python fit_solvent_permittivity.py [--processes 32] [--max-pressure 5e5|none] [--write-parameters]
-All data points with p < max_pressure (Pa; default 5 bar, Rueben et al. 2024a) or without pressure are fitted.
+usage: python fit_solvent_permittivity.py [--processes 32] [--max-pressure none|5e5] [--write-parameters]
+All data points are fitted (default, decision 2026-10-30); with --max-pressure only points with p < max_pressure (Pa;
+Rueben et al. 2024a: 5 bar) or without pressure.
 Errors are reported for all liquid points below 5 bar (columns *_low) and at or above 5 bar (columns *_high).
 Writes results/solvent_permittivity[_p<max_pressure>].csv (results/ is not tracked: derived from licensed data);
 --write-parameters writes the permittivity records of all fitted substances to parameters/epcpsaft/esper2023.json.
@@ -85,7 +86,7 @@ def main():
     ap.add_argument("--write-parameters", action="store_true")
     ap.add_argument("--processes", type=int, default=os.cpu_count())
     ap.add_argument("--cas", nargs="*", help="only these substances")
-    ap.add_argument("--max-pressure", default="5e5", help="Pa, or 'none' for no limit")
+    ap.add_argument("--max-pressure", default="none", help="Pa, or 'none' for no limit (default)")
     a = ap.parse_args()
     max_pressure = None if a.max_pressure.lower() == "none" else float(a.max_pressure)
 
@@ -107,7 +108,7 @@ def main():
     with Pool(a.processes) as pool:
         res = pool.map(one, jobs, chunksize=1)
     RESULTS.mkdir(exist_ok=True)
-    out = RESULTS / ("solvent_permittivity.csv" if max_pressure == 5e5 else f"solvent_permittivity_p{a.max_pressure}.csv")
+    out = RESULTS / ("solvent_permittivity.csv" if max_pressure is None else f"solvent_permittivity_p{a.max_pressure}.csv")
     res = pd.DataFrame(res)
     res.to_csv(out, index=False)
     print(out, res.status.value_counts().to_dict())
@@ -116,7 +117,8 @@ def main():
 
 
 def write_parameters(res, file=pm.PARAMETERS / "esper2023.json"):
-    """set the permittivity records (4 decimals) of the fitted substances; all other entries unchanged"""
+    """set the permittivity records (4 decimals) of the fitted substances and remove the permittivity records of all
+    other substances (all permittivity records of the file are results of this fit); all other entries unchanged"""
     raw = open(file).read()
     records = json.loads(raw)
     x = {r.cas: [getattr(r, k) for k in pm.NAMES] for r in res.itertuples()}
@@ -124,6 +126,8 @@ def write_parameters(res, file=pm.PARAMETERS / "esper2023.json"):
         cas = r["identifier"].get("cas")
         if cas in x:
             r["permittivity_record"] = pm.permittivity_record(x[cas])
+        else:
+            r.pop("permittivity_record", None)
     open(file, "w").write(json.dumps(records, indent=4, ensure_ascii=True) + ("\n" if raw.endswith("\n") else ""))
     print(f"{file}: permittivity records of {len(x)} substances")
 

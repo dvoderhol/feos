@@ -125,16 +125,19 @@ impl EPcpSaft {
 
     /// Reduced Helmholtz energy densities of all contributions for parameters `p`
     /// (the parameters of this model, or the same parameters as dual numbers).
+    /// `hard_chain`: evaluate the hard-chain term (also needed if all m = 1 but derivatives
+    /// with respect to m are calculated).
     pub(crate) fn contributions<D: DualNum<f64> + Copy>(
         &self,
         p: &EPcpSaftPars<D>,
         state: &StateHD<D>,
+        hard_chain: bool,
     ) -> Vec<(&'static str, D)> {
         let mut v = Vec::with_capacity(9);
         let d = p.diameter(state.temperature);
 
         v.push(("Hard Sphere", hard_sphere(p, state)));
-        if self.hard_chain {
+        if hard_chain {
             v.push(("Hard Chain", HardChain.helmholtz_energy_density(p, state)))
         }
         v.push(("Dispersion", Dispersion.helmholtz_energy_density(p, state)));
@@ -259,7 +262,7 @@ impl ResidualDyn for EPcpSaft {
         &self,
         state: &StateHD<D>,
     ) -> Vec<(&'static str, D)> {
-        self.contributions(&self.params.map(D::from), state)
+        self.contributions(&self.params.map(D::from), state, self.hard_chain)
     }
 }
 
@@ -1313,6 +1316,72 @@ mod tests_electrolyte {
         Ok(())
     }
 
+    /// Dipole, quadrupole and dipole-quadrupole terms (both DQ variants) identical to PCP-SAFT
+    /// (the PCP-SAFT parameter files contain no quadrupole moments).
+    #[cfg(feature = "pcsaft")]
+    #[test]
+    fn polar_identical_to_pcsaft() -> FeosResult<()> {
+        use crate::pcsaft::{self, PcSaft, PcSaftOptions, PcSaftParameters};
+        let json = r#"[
+            {"identifier": {"name": "co2"}, "molarweight": 44.0, "m": 1.5131, "sigma": 3.1869, "epsilon_k": 163.33, "q": 4.4},
+            {"identifier": {"name": "acetone"}, "molarweight": 58.08, "m": 2.7447, "sigma": 3.2742, "epsilon_k": 232.99, "mu": 2.88},
+            {"identifier": {"name": "polar"}, "molarweight": 60.0, "m": 2.0, "sigma": 3.5, "epsilon_k": 250.0, "mu": 1.5, "q": 2.0}
+        ]"#;
+        let x = dvector![0.5, 0.3, 0.2];
+        for (dq_pcsaft, dq_epcpsaft) in [
+            (pcsaft::DQVariants::DQ35, DQVariants::DQ35),
+            (pcsaft::DQVariants::DQ44, DQVariants::DQ44),
+        ] {
+            let pcsaft = PcSaft::with_options(
+                PcSaftParameters::new(serde_json::from_str(json).unwrap(), vec![])?,
+                PcSaftOptions {
+                    dq_variant: dq_pcsaft,
+                    ..Default::default()
+                },
+            );
+            let epcpsaft = EPcpSaft::with_options(
+                EPcpSaftParameters::new(serde_json::from_str(json).unwrap(), vec![])?,
+                EPcpSaftOptions {
+                    dq_variant: dq_epcpsaft,
+                    ..Default::default()
+                },
+            )?;
+            for (t, v) in [(250.0, 60.0), (350.0, 1.0e3)] {
+                let s = StateHD::new(t, v, &x);
+                let a = pcsaft.reduced_helmholtz_energy_density_contributions(&s);
+                let b = epcpsaft.reduced_helmholtz_energy_density_contributions(&s);
+                assert_eq!(a.len(), 6);
+                assert_eq!(a, b);
+            }
+        }
+        Ok(())
+    }
+
+    /// Independent check of the ion terms: ePC-SAFT (advanced, crate::epcsaft) with the same
+    /// records. The ionic and Born contributions differ only by the vacuum permittivity
+    /// (epcsaft: 8.85416e-12 F/m, here 8.8541878188e-12 F/m: relative difference 3.2e-6).
+    #[cfg(feature = "epcsaft")]
+    #[test]
+    fn ion_terms_as_epcsaft() -> FeosResult<()> {
+        use crate::epcsaft::{ElectrolytePcSaft, ElectrolytePcSaftParameters};
+        let json = serde_json::to_string(&water_nacl_records()).unwrap();
+        let epcsaft = ElectrolytePcSaft::new(ElectrolytePcSaftParameters::new(
+            serde_json::from_str(&json).unwrap(),
+            vec![],
+        )?)?;
+        let epcpsaft = EPcpSaft::new(water_nacl_parameters())?;
+        for (t, x) in [(298.15, [0.9, 0.05, 0.05]), (350.0, [0.98, 0.01, 0.01])] {
+            let s = StateHD::new(t, 30.0, &DVector::from_row_slice(&x));
+            let a = epcsaft.reduced_helmholtz_energy_density_contributions(&s);
+            let b = epcpsaft.reduced_helmholtz_energy_density_contributions(&s);
+            for name in ["Ionic", "Born"] {
+                let find = |c: &[(&str, f64)]| c.iter().find(|(n, _)| *n == name).unwrap().1;
+                assert_relative_eq!(find(&a), find(&b), max_relative = 1e-5);
+            }
+        }
+        Ok(())
+    }
+
     /// parameters/epcpsaft: PCP-SAFT entries identical to parameters/pcsaft, only permittivity records added;
     /// all records can be read as ePCP-SAFT records.
     #[test]
@@ -1460,25 +1529,27 @@ mod tests_electrolyte {
         let eos = EPcpSaft::new(water_nacl_parameters())?;
         let t = 298.15;
         let v = 30.0;
-        let c = 1e-8;
-        let n = dvector![
-            Dual64::from(1.0),
-            Dual64::from(c).derivative(),
-            Dual64::from(c)
-        ];
-        let s = StateHD::new(Dual64::from(t), Dual64::from(v), &n);
-        let contributions = eos.reduced_helmholtz_energy_density_contributions(&s);
-        let (_, ionic) = contributions
-            .iter()
-            .find(|(name, _)| *name == "Ionic")
-            .unwrap();
-        let mu_dh = (*ionic * v).eps;
+        // deviations from the limiting law are of order kappa d (6e-4, 6e-7, 6e-10)
+        for (c, tol) in [(1e-8, 1e-3), (1e-14, 1e-6), (1e-20, 1e-9)] {
+            let n = dvector![
+                Dual64::from(1.0),
+                Dual64::from(c).derivative(),
+                Dual64::from(c)
+            ];
+            let s = StateHD::new(Dual64::from(t), Dual64::from(v), &n);
+            let contributions = eos.reduced_helmholtz_energy_density_contributions(&s);
+            let (_, ionic) = contributions
+                .iter()
+                .find(|(name, _)| *name == "Ionic")
+                .unwrap();
+            let mu_dh = (*ionic * v).eps;
 
-        let s = StateHD::new(t, v, &dvector![1.0, c, c]);
-        let eps = eos.permittivity(&s).unwrap();
-        let lambda_b = eos.params.bjerrum_length(t, eps);
-        let kappa = (4.0 * std::f64::consts::PI * lambda_b * 2.0 * c / v).sqrt();
-        assert_relative_eq!(mu_dh, -lambda_b * kappa / 2.0, max_relative = 1e-3);
+            let s = StateHD::new(t, v, &dvector![1.0, c, c]);
+            let eps = eos.permittivity(&s).unwrap();
+            let lambda_b = eos.params.bjerrum_length(t, eps);
+            let kappa = (4.0 * std::f64::consts::PI * lambda_b * 2.0 * c / v).sqrt();
+            assert_relative_eq!(mu_dh, -lambda_b * kappa / 2.0, max_relative = tol);
+        }
         Ok(())
     }
 

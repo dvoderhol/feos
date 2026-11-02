@@ -35,12 +35,19 @@ pub enum EPcpSaftParameter {
 pub struct EPcpSaftAD<D> {
     model: Arc<EPcpSaft>,
     pub params: EPcpSaftPars<D>,
+    /// hard-chain term evaluated (m != 1 for any component, or derivatives with respect to m)
+    hard_chain: bool,
 }
 
 impl EPcpSaftAD<f64> {
     pub fn new(model: Arc<EPcpSaft>) -> Self {
         let params = model.params.clone();
-        Self { model, params }
+        let hard_chain = model.hard_chain;
+        Self {
+            model,
+            params,
+            hard_chain,
+        }
     }
 
     /// Model with derivatives with respect to `parameters` (gradient component k
@@ -55,6 +62,13 @@ impl EPcpSaftAD<f64> {
         let mut p = p0.map(DualSVec::from);
         let error = |msg: String| Err(FeosError::IncompatibleParameters(msg));
         for (k, &parameter) in parameters.iter().enumerate() {
+            let same = |&q: &EPcpSaftParameter| match (q, parameter) {
+                (KIJ(a, b), KIJ(c, d)) => (a, b) == (c, d) || (a, b) == (d, c),
+                _ => q == parameter,
+            };
+            if parameters[..k].iter().any(same) {
+                return error(format!("{parameter:?}: requested more than once"));
+            }
             let seed = |x: &mut DualSVec<f64, f64, P>| {
                 x.eps = Derivative::derivative_generic(Const::<P>, U1, k)
             };
@@ -76,7 +90,14 @@ impl EPcpSaftAD<f64> {
             match parameter {
                 M(i) => seed(&mut p.m[i]),
                 Sigma(i) => seed(&mut p.sigma[i]),
-                EpsilonK(i) => seed(&mut p.epsilon_k[i]),
+                EpsilonK(i) => {
+                    if p0.epsilon_k[i] == 0.0 {
+                        return error(format!(
+                            "{parameter:?}: epsilon_k = 0, sqrt(epsilon_k_i epsilon_k_j) is not differentiable"
+                        ));
+                    }
+                    seed(&mut p.epsilon_k[i])
+                }
                 Mu(i) => {
                     if !p0.dipole_comp.contains(&i) {
                         return error(format!(
@@ -117,9 +138,11 @@ impl EPcpSaftAD<f64> {
                 BornDeltaAnion => seed(&mut p.born_delta[1]),
             }
         }
+        let hard_chain = self.hard_chain || parameters.iter().any(|p| matches!(p, M(_)));
         Ok(EPcpSaftAD {
             model: self.model.clone(),
             params: p.map(|x| x),
+            hard_chain,
         })
     }
 }
@@ -136,6 +159,7 @@ impl<D: DualNum<f64> + Copy> Residual<Dyn, D> for EPcpSaftAD<D> {
         EPcpSaftAD {
             model: self.model.clone(),
             params: self.params.map(|x| x.re()),
+            hard_chain: self.hard_chain,
         }
     }
 
@@ -143,6 +167,7 @@ impl<D: DualNum<f64> + Copy> Residual<Dyn, D> for EPcpSaftAD<D> {
         EPcpSaftAD {
             model: self.model.clone(),
             params: self.params.map(|x| D2::from_inner(&x)),
+            hard_chain: self.hard_chain,
         }
     }
 
@@ -156,7 +181,8 @@ impl<D: DualNum<f64> + Copy> Residual<Dyn, D> for EPcpSaftAD<D> {
         &self,
         state: &StateHD<D>,
     ) -> Vec<(&'static str, D)> {
-        self.model.contributions(&self.params, state)
+        self.model
+            .contributions(&self.params, state, self.hard_chain)
     }
 }
 
@@ -217,7 +243,7 @@ mod tests {
                 BornDeltaAnion => p.born_delta[1] += h,
             }
             let p = p.map(|x| x);
-            eos.contributions(&p, state)
+            eos.contributions(&p, state, true)
                 .iter()
                 .map(|(_, a)| a)
                 .sum::<f64>()
@@ -330,7 +356,59 @@ mod tests {
         assert!(ad.derivatives([KIJ(1, 1)]).is_err());
         assert!(ad.derivatives([Mu(0)]).is_err());
         assert!(ad.derivatives([Sigma(3)]).is_err());
+        assert!(ad.derivatives([Sigma(1), Sigma(1)]).is_err());
+        assert!(ad.derivatives([KIJ(0, 1), KIJ(1, 0)]).is_err());
         Ok(())
+    }
+
+    /// Ions without dispersion (epsilon_k = 0): finite derivatives with respect to all other
+    /// parameters; epsilon_k of these ions cannot be differentiated.
+    #[test]
+    fn gradient_zero_epsilon_k() -> FeosResult<()> {
+        let mut records = water_nacl_records();
+        records[1].model_record.epsilon_k = 0.0;
+        records[2].model_record.epsilon_k = 0.0;
+        let binary = vec![BinaryRecord::new(
+            0,
+            1,
+            Some(EPcpSaftBinaryRecord::new(0.01)),
+        )];
+        let eos = EPcpSaft::new(EPcpSaftParameters::new(records.clone(), binary.clone())?)?;
+        assert!(
+            EPcpSaftAD::new(Arc::new(eos))
+                .derivatives([EpsilonK(1)])
+                .is_err()
+        );
+        let eos = EPcpSaft::new(EPcpSaftParameters::new(records, binary)?)?;
+        let state = StateHD::new(310.0, 25.0, &dvector![0.9, 0.05, 0.05]);
+        check_gradient(
+            eos,
+            state,
+            [
+                Sigma(1),
+                Sigma(2),
+                EpsilonK(0),
+                KIJ(0, 1),
+                M(0),
+                DipoleScaling(1),
+            ],
+        )
+    }
+
+    /// All m = 1: the hard-chain term vanishes, its derivative with respect to m does not.
+    #[test]
+    fn gradient_hard_chain_spheres() -> FeosResult<()> {
+        let records = serde_json::from_str(
+            r#"[
+                {"identifier": {"name": "a"}, "molarweight": 16.0, "m": 1.0, "sigma": 3.7, "epsilon_k": 150.0},
+                {"identifier": {"name": "b"}, "molarweight": 40.0, "m": 1.0, "sigma": 3.4, "epsilon_k": 120.0}
+            ]"#,
+        )
+        .expect("Unable to parse json.");
+        let eos = EPcpSaft::new(EPcpSaftParameters::new(records, vec![])?)?;
+        assert!(!eos.hard_chain);
+        let state = StateHD::new(200.0, 100.0, &dvector![0.6, 0.4]);
+        check_gradient(eos, state, [M(0), M(1), Sigma(0)])
     }
 
     /// Derivative of the liquid density at given (T, p) (implicit differentiation in feos-core)

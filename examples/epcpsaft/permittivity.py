@@ -51,7 +51,7 @@ def ddb(path=None):
     if path is None:
         raise RuntimeError("set EPCPSAFT_DDB_PERMITTIVITY to the DDB permittivity export (tab separated)")
     cols = ["substance_id", "cas", "phase", "temperature", "pressure", "value", "const_prop", "const_value",
-            "dipole_moment"]
+            "dipole_moment", "type", "database", "reference_id", "authors", "year"]
     return pd.read_csv(path, sep="\t", low_memory=False, usecols=cols)
 
 
@@ -62,16 +62,45 @@ EXCLUDED = [
 ]
 
 
-def rueben_filter(df, max_pressure=5e5):
-    """Rueben et al. (2024a): liquid phase, p < 5 bar or not given, frequency < 1000 Hz or not given;
-    max_pressure=None: no pressure limit. Points in EXCLUDED are removed."""
+# experimental data types of the DDB export ("Experimental": 40 points of one reference, digitized from figures);
+# not used: Smoothed, Calculated, Evaluated, Cited, Unreferenced (decision 2026-11-02)
+EXPERIMENTAL = ("Experiment", "Experimental")
+
+
+def rueben_filter(df, max_pressure=None, experimental_only=True, remove_duplicates=True):
+    """Rueben et al. (2024a): liquid phase, frequency < 1000 Hz or not given, p < 5 bar or not given.
+    Default max_pressure=None: no pressure limit (decision 2026-10-30); max_pressure=5e5: limit of Rueben et al. (2024a).
+    experimental_only: only the data types in EXPERIMENTAL; remove_duplicates: see `duplicates` (decision 2026-11-02).
+    Points in EXCLUDED are removed."""
     frequency_ok = (df.const_prop == "Frequency [Hz]") & (df.const_value < 1000) | df.const_value.isna()
     keep = (df.phase == "Liquid") & frequency_ok
     if max_pressure is not None:
         keep &= (df.pressure < max_pressure) | df.pressure.isna()
+    if experimental_only:
+        keep &= df.type.isin(EXPERIMENTAL)
     for cas, T, value, _ in EXCLUDED:
         keep &= ~((df.cas == cas) & np.isclose(df.temperature, T) & np.isclose(df.value, value))
-    return df[keep]
+    df = df[keep]
+    return df[~duplicates(df)] if remove_duplicates else df
+
+
+def duplicates(df):
+    """Rows that repeat another row (the first one is kept, DDB before ThermoML):
+    - same substance, temperature (0.01 K), pressure (100 Pa or both not given) and permittivity (0.001), and
+      the same reference or the same first author and year (one publication under two reference ids, mostly DDB and
+      ThermoML entries), or
+    - identical substance, temperature, pressure (or both not given) and permittivity (exactly equal numbers), from
+      any reference (decision 2026-11-02)."""
+    key = pd.DataFrame({
+        "cas": df.cas, "T": df.temperature.round(2), "p": df.pressure.round(-2).fillna(-1.0), "eps": df.value.round(3),
+        "author": df.authors.fillna("").str.split(r"[,;]").str[0].str.strip().str.lower(),
+        "year": df.year.astype(str).str[:4], "reference": df.reference_id})
+    order = np.argsort((df.database != "DDB").values, kind="stable")
+    k = key.iloc[order]
+    exact = pd.DataFrame({"cas": df.cas, "T": df.temperature, "p": df.pressure.fillna(-1.0), "eps": df.value}).iloc[order]
+    dup = (k.duplicated(["cas", "T", "p", "eps", "reference"]) | k.duplicated(["cas", "T", "p", "eps", "author", "year"])
+           | exact.duplicated())
+    return pd.Series(dup.values, index=k.index).reindex(df.index)
 
 
 def substance_data(df, cas):

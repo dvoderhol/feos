@@ -482,9 +482,9 @@
         "mu": 1.978,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 4.1567,
-                "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.127
+                "dipole_scaling": 3.2939,
+                "polarizability_scaling": 8.4418,
+                "correlation_integral_parameter": 0.1008
             }
         }
     },
@@ -523,9 +523,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 12.5159,
+                "dipole_scaling": 12.5779,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.1341
+                "correlation_integral_parameter": 0.1384
             }
         }
     },
@@ -569,9 +569,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 8.0697,
+                "dipole_scaling": 8.0921,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.1355
+                "correlation_integral_parameter": 0.1438
             }
         }
     },
@@ -640,9 +640,9 @@
         "epsilon_k": 233.33054,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.0,
-                "polarizability_scaling": 10.4258,
-                "correlation_integral_parameter": 0.0
+                "dipole_scaling": 0.0039,
+                "polarizability_scaling": 10.4252,
+                "correlation_integral_parameter": 1.0
             }
         }
     },
@@ -668,9 +668,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 6.9913,
+                "dipole_scaling": 6.9581,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.6478
+                "correlation_integral_parameter": 0.646
             }
         }
     },
@@ -838,7 +838,7 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 10.1265,
+                "dipole_scaling": 10.025,
                 "polarizability_scaling": 0.0,
                 "correlation_integral_parameter": 0.0
             }
@@ -1128,9 +1128,9 @@
         "epsilon_k": 224.06583,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.0218,
-                "polarizability_scaling": 8.2729,
-                "correlation_integral_parameter": 0.0044
+                "dipole_scaling": 0.0056,
+                "polarizability_scaling": 8.4703,
+                "correlation_integral_parameter": 1.0
             }
         }
     },
@@ -1149,7 +1149,7 @@
         "permittivity_record": {
             "PerturbationTheory": {
                 "dipole_scaling": 0.0,
-                "polarizability_scaling": 0.1301,
+                "polarizability_scaling": 0.1921,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -1208,9 +1208,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 7.2408,
-                "polarizability_scaling": 25.8813,
-                "correlation_integral_parameter": 0.1677
+                "dipole_scaling": 7.2623,
+                "polarizability_scaling": 26.1767,
+                "correlation_integral_parameter": 0.1686
             }
         }
     },
@@ -1236,7 +1236,7 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 8.7523,
+                "dipole_scaling": 8.4441,
                 "polarizability_scaling": 0.0,
                 "correlation_integral_parameter": 0.0
             }
@@ -1537,9 +1537,9 @@
         "epsilon_k": 335.82106,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 8.1758,
-                "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.5298
+                "dipole_scaling": 3.5716,
+                "polarizability_scaling": 27.8341,
+                "correlation_integral_parameter": 0.2699
             }
         }
     },
@@ -1558,9 +1558,9 @@
         "mu": 2.5,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 8.4459,
+                "dipole_scaling": 8.5586,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.3804
+                "correlation_integral_parameter": 0.3858
             }
         }
     },
@@ -1697,8 +1697,8 @@
         "permittivity_record": {
             "PerturbationTheory": {
                 "dipole_scaling": 0.0,
-                "polarizability_scaling": 44.6731,
-                "correlation_integral_parameter": 0.6688
+                "polarizability_scaling": 44.6888,
+                "correlation_integral_parameter": 0.6685
             }
         }
     },
@@ -1717,9 +1717,9 @@
         "mu": 1.78,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 5.8308,
+                "dipole_scaling": 5.8871,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.5581
+                "correlation_integral_parameter": 0.561
             }
         }
     },
@@ -1745,9 +1745,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 8.1864,
+                "dipole_scaling": 8.0842,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.2049
+                "correlation_integral_parameter": 0.1914
             }
         }
     },
@@ -1970,9 +1970,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 5.1747,
-                "polarizability_scaling": 7.1625,
-                "correlation_integral_parameter": 0.1264
+                "dipole_scaling": 6.1933,
+                "polarizability_scaling": 0.0,
+                "correlation_integral_parameter": 0.1393
             }
         }
     },
@@ -2127,7 +2127,14 @@
         "m": 2.47417,
         "sigma": 3.28921,
         "epsilon_k": 161.9028,
-        "mu": 2.32
+        "mu": 2.32,
+        "permittivity_record": {
+            "PerturbationTheory": {
+                "dipole_scaling": 3.3739,
+                "polarizability_scaling": 16.9462,
+                "correlation_integral_parameter": 0.1348
+            }
+        }
     },
     {
         "identifier": {
@@ -2189,9 +2196,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 25.313,
+                "dipole_scaling": 25.2016,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.1768
+                "correlation_integral_parameter": 0.1761
             }
         }
     },
@@ -2433,9 +2440,9 @@
         "mu": 1.6,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 4.034,
+                "dipole_scaling": 4.0428,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.456
+                "correlation_integral_parameter": 0.4618
             }
         }
     },
@@ -2500,9 +2507,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 7.8139,
+                "dipole_scaling": 7.8221,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.1268
+                "correlation_integral_parameter": 0.1249
             }
         }
     },
@@ -2537,9 +2544,9 @@
         "epsilon_k": 287.51747,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.1229,
-                "polarizability_scaling": 13.4406,
-                "correlation_integral_parameter": 0.0
+                "dipole_scaling": 0.1476,
+                "polarizability_scaling": 13.549,
+                "correlation_integral_parameter": 1.0
             }
         }
     },
@@ -2610,9 +2617,9 @@
         "mu": 2.13,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 7.755,
+                "dipole_scaling": 7.285,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.3316
+                "correlation_integral_parameter": 0.233
             }
         }
     },
@@ -2636,7 +2643,7 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 4.1083,
+                "dipole_scaling": 4.0817,
                 "polarizability_scaling": 0.0,
                 "correlation_integral_parameter": 1.0
             }
@@ -2804,9 +2811,9 @@
         "mu": 2.05,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 5.7398,
-                "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.3971
+                "dipole_scaling": 4.567,
+                "polarizability_scaling": 8.915,
+                "correlation_integral_parameter": 0.3615
             }
         }
     },
@@ -2924,8 +2931,8 @@
         "epsilon_k": 191.45389,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.0034,
-                "polarizability_scaling": 4.4725,
+                "dipole_scaling": 0.0,
+                "polarizability_scaling": 4.5216,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -3015,9 +3022,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 1.7658,
-                "polarizability_scaling": 13.3304,
-                "correlation_integral_parameter": 0.0099
+                "dipole_scaling": 1.6802,
+                "polarizability_scaling": 14.4457,
+                "correlation_integral_parameter": 0.0
             }
         }
     },
@@ -3265,7 +3272,7 @@
         "permittivity_record": {
             "PerturbationTheory": {
                 "dipole_scaling": 0.0,
-                "polarizability_scaling": 23.6128,
+                "polarizability_scaling": 23.5303,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -3946,7 +3953,7 @@
         "permittivity_record": {
             "PerturbationTheory": {
                 "dipole_scaling": 13.2983,
-                "polarizability_scaling": 41.161,
+                "polarizability_scaling": 41.1611,
                 "correlation_integral_parameter": 0.1684
             }
         }
@@ -4085,7 +4092,7 @@
         "permittivity_record": {
             "PerturbationTheory": {
                 "dipole_scaling": 0.0,
-                "polarizability_scaling": 45.224,
+                "polarizability_scaling": 44.6846,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -4137,9 +4144,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 14.6585,
-                "polarizability_scaling": 46.1918,
-                "correlation_integral_parameter": 0.1292
+                "dipole_scaling": 15.3144,
+                "polarizability_scaling": 43.3858,
+                "correlation_integral_parameter": 0.1374
             }
         }
     },
@@ -4165,9 +4172,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 20.9303,
+                "dipole_scaling": 20.9854,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.0615
+                "correlation_integral_parameter": 0.0618
             }
         }
     },
@@ -4498,8 +4505,8 @@
         "mu": 1.8,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 3.3598,
-                "polarizability_scaling": 13.3333,
+                "dipole_scaling": 3.2971,
+                "polarizability_scaling": 14.0111,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -4679,9 +4686,9 @@
         "mu": 1.94,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 3.6322,
-                "polarizability_scaling": 21.6558,
-                "correlation_integral_parameter": 0.5457
+                "dipole_scaling": 3.8967,
+                "polarizability_scaling": 20.3997,
+                "correlation_integral_parameter": 0.6163
             }
         }
     },
@@ -4912,8 +4919,8 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 1.8686,
-                "polarizability_scaling": 93.8723,
+                "dipole_scaling": 1.8685,
+                "polarizability_scaling": 93.8725,
                 "correlation_integral_parameter": 0.2713
             }
         }
@@ -5001,9 +5008,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 3.0454,
-                "polarizability_scaling": 14.6847,
-                "correlation_integral_parameter": 0.3046
+                "dipole_scaling": 2.5899,
+                "polarizability_scaling": 17.3058,
+                "correlation_integral_parameter": 0.1352
             }
         }
     },
@@ -5064,7 +5071,7 @@
         "permittivity_record": {
             "PerturbationTheory": {
                 "dipole_scaling": 0.0,
-                "polarizability_scaling": 26.7019,
+                "polarizability_scaling": 26.9973,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -5357,9 +5364,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 9.2037,
+                "dipole_scaling": 9.2327,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.1712
+                "correlation_integral_parameter": 0.1816
             }
         }
     },
@@ -5437,9 +5444,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 5.3401,
+                "dipole_scaling": 5.5715,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.9058
+                "correlation_integral_parameter": 0.8832
             }
         }
     },
@@ -5485,9 +5492,9 @@
         "epsilon_k": 292.54982,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.0571,
-                "polarizability_scaling": 11.4324,
-                "correlation_integral_parameter": 0.0
+                "dipole_scaling": 0.0928,
+                "polarizability_scaling": 11.3282,
+                "correlation_integral_parameter": 1.0
             }
         }
     },
@@ -5573,9 +5580,9 @@
         "epsilon_k": 238.17817,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 4.683,
-                "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.6896
+                "dipole_scaling": 4.014,
+                "polarizability_scaling": 4.0479,
+                "correlation_integral_parameter": 0.4397
             }
         }
     },
@@ -5662,7 +5669,7 @@
         "permittivity_record": {
             "PerturbationTheory": {
                 "dipole_scaling": 0.0,
-                "polarizability_scaling": 47.2402,
+                "polarizability_scaling": 47.0525,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -5687,9 +5694,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 16.9653,
-                "polarizability_scaling": 22.4638,
-                "correlation_integral_parameter": 0.1613
+                "dipole_scaling": 18.702,
+                "polarizability_scaling": 13.2922,
+                "correlation_integral_parameter": 0.169
             }
         }
     },
@@ -5721,7 +5728,7 @@
         "permittivity_record": {
             "PerturbationTheory": {
                 "dipole_scaling": 0.0,
-                "polarizability_scaling": 16.8222,
+                "polarizability_scaling": 16.8299,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -5766,9 +5773,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 13.7592,
+                "dipole_scaling": 13.7638,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.121
+                "correlation_integral_parameter": 0.1212
             }
         }
     },
@@ -5915,9 +5922,9 @@
         "mu": 1.85,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 2.7134,
-                "polarizability_scaling": 5.6214,
-                "correlation_integral_parameter": 0.1324
+                "dipole_scaling": 2.4847,
+                "polarizability_scaling": 7.4265,
+                "correlation_integral_parameter": 0.119
             }
         }
     },
@@ -6081,9 +6088,9 @@
         "mu": 0.9,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 1.0306,
-                "polarizability_scaling": 11.2649,
-                "correlation_integral_parameter": 1.0
+                "dipole_scaling": 0.0,
+                "polarizability_scaling": 18.3421,
+                "correlation_integral_parameter": 0.0
             }
         }
     },
@@ -6138,9 +6145,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 17.2562,
+                "dipole_scaling": 17.1733,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.1589
+                "correlation_integral_parameter": 0.1569
             }
         }
     },
@@ -6176,9 +6183,9 @@
         "epsilon_k": 282.31227,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.0,
-                "polarizability_scaling": 13.7488,
-                "correlation_integral_parameter": 0.0
+                "dipole_scaling": 1.6701,
+                "polarizability_scaling": 0.0,
+                "correlation_integral_parameter": 1.0
             }
         }
     },
@@ -6320,7 +6327,7 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 7.4451,
+                "dipole_scaling": 9.0114,
                 "polarizability_scaling": 0.0,
                 "correlation_integral_parameter": 0.0
             }
@@ -6447,9 +6454,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 9.0465,
-                "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.0998
+                "dipole_scaling": 7.2077,
+                "polarizability_scaling": 8.4522,
+                "correlation_integral_parameter": 0.0
             }
         }
     },
@@ -6494,9 +6501,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 8.8633,
+                "dipole_scaling": 9.5,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.0
+                "correlation_integral_parameter": 0.1527
             }
         }
     },
@@ -6618,9 +6625,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 11.2193,
+                "dipole_scaling": 11.2248,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.192
+                "correlation_integral_parameter": 0.1924
             }
         }
     },
@@ -6778,9 +6785,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 4.5249,
+                "dipole_scaling": 4.6601,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.5582
+                "correlation_integral_parameter": 0.6029
             }
         }
     },
@@ -6905,9 +6912,9 @@
         "epsilon_k": 150.07147,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.0,
-                "polarizability_scaling": 2.7263,
-                "correlation_integral_parameter": 0.0
+                "dipole_scaling": 0.0079,
+                "polarizability_scaling": 2.5103,
+                "correlation_integral_parameter": 1.0
             }
         }
     },
@@ -7016,8 +7023,8 @@
         "epsilon_k": 209.08586,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.0175,
-                "polarizability_scaling": 6.3446,
+                "dipole_scaling": 0.0,
+                "polarizability_scaling": 6.5915,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -7033,7 +7040,14 @@
         "molarweight": 137.99,
         "m": 2.81452,
         "sigma": 3.31739,
-        "epsilon_k": 140.26853
+        "epsilon_k": 140.26853,
+        "permittivity_record": {
+            "PerturbationTheory": {
+                "dipole_scaling": 0.7475,
+                "polarizability_scaling": 0.0,
+                "correlation_integral_parameter": 1.0
+            }
+        }
     },
     {
         "identifier": {
@@ -7096,9 +7110,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 30.3924,
+                "dipole_scaling": 36.1136,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.2796
+                "correlation_integral_parameter": 0.2688
             }
         }
     },
@@ -7122,9 +7136,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 6.7861,
+                "dipole_scaling": 6.8787,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.7768
+                "correlation_integral_parameter": 0.7839
             }
         }
     },
@@ -7280,14 +7294,7 @@
             {
                 "nb": 2.0
             }
-        ],
-        "permittivity_record": {
-            "PerturbationTheory": {
-                "dipole_scaling": 3.9407,
-                "polarizability_scaling": 25.3758,
-                "correlation_integral_parameter": 0.8595
-            }
-        }
+        ]
     },
     {
         "identifier": {
@@ -7729,9 +7736,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 11.4634,
-                "polarizability_scaling": 38.5694,
-                "correlation_integral_parameter": 0.1635
+                "dipole_scaling": 12.4233,
+                "polarizability_scaling": 32.8793,
+                "correlation_integral_parameter": 0.1663
             }
         }
     },
@@ -7789,9 +7796,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 6.7764,
-                "polarizability_scaling": 15.859,
-                "correlation_integral_parameter": 0.3195
+                "dipole_scaling": 6.7844,
+                "polarizability_scaling": 15.7886,
+                "correlation_integral_parameter": 0.3196
             }
         }
     },
@@ -8023,9 +8030,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 5.5637,
+                "dipole_scaling": 5.9962,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.7324
+                "correlation_integral_parameter": 0.8257
             }
         }
     },
@@ -8051,8 +8058,8 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 3.4774,
-                "polarizability_scaling": 7.1084,
+                "dipole_scaling": 3.4669,
+                "polarizability_scaling": 7.1861,
                 "correlation_integral_parameter": 1.0
             }
         }
@@ -8188,9 +8195,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 6.7007,
+                "dipole_scaling": 6.8262,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.6659
+                "correlation_integral_parameter": 0.7493
             }
         }
     },
@@ -8209,7 +8216,7 @@
         "permittivity_record": {
             "PerturbationTheory": {
                 "dipole_scaling": 0.0,
-                "polarizability_scaling": 18.1865,
+                "polarizability_scaling": 18.1376,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -8719,7 +8726,7 @@
         "permittivity_record": {
             "PerturbationTheory": {
                 "dipole_scaling": 0.0,
-                "polarizability_scaling": 21.3905,
+                "polarizability_scaling": 21.3105,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -8819,8 +8826,8 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.0089,
-                "polarizability_scaling": 1.0919,
+                "dipole_scaling": 0.0092,
+                "polarizability_scaling": 1.0792,
                 "correlation_integral_parameter": 1.0
             }
         }
@@ -8980,9 +8987,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 16.1547,
+                "dipole_scaling": 16.1512,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.1486
+                "correlation_integral_parameter": 0.1487
             }
         }
     },
@@ -9027,9 +9034,9 @@
         "epsilon_k": 117.80903,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.009,
-                "polarizability_scaling": 1.451,
-                "correlation_integral_parameter": 1.0
+                "dipole_scaling": 0.0,
+                "polarizability_scaling": 1.6602,
+                "correlation_integral_parameter": 0.0
             }
         }
     },
@@ -9047,9 +9054,9 @@
         "epsilon_k": 228.73279,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.0,
-                "polarizability_scaling": 10.4313,
-                "correlation_integral_parameter": 0.0
+                "dipole_scaling": 0.0717,
+                "polarizability_scaling": 9.8065,
+                "correlation_integral_parameter": 1.0
             }
         }
     },
@@ -9163,9 +9170,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 4.5754,
-                "polarizability_scaling": 6.7322,
-                "correlation_integral_parameter": 0.6971
+                "dipole_scaling": 4.6838,
+                "polarizability_scaling": 5.9773,
+                "correlation_integral_parameter": 0.701
             }
         }
     },
@@ -9345,8 +9352,8 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.0036,
-                "polarizability_scaling": 1.4502,
+                "dipole_scaling": 0.0016,
+                "polarizability_scaling": 1.5303,
                 "correlation_integral_parameter": 1.0
             }
         }
@@ -9551,8 +9558,8 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.0,
-                "polarizability_scaling": 3.7974,
+                "dipole_scaling": 0.086,
+                "polarizability_scaling": 2.6655,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -9674,9 +9681,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 2.4916,
-                "polarizability_scaling": 8.7568,
-                "correlation_integral_parameter": 0.2667
+                "dipole_scaling": 0.0,
+                "polarizability_scaling": 27.2388,
+                "correlation_integral_parameter": 0.0
             }
         }
     },
@@ -9899,8 +9906,8 @@
         "permittivity_record": {
             "PerturbationTheory": {
                 "dipole_scaling": 0.0,
-                "polarizability_scaling": 12.4524,
-                "correlation_integral_parameter": 0.0
+                "polarizability_scaling": 12.4246,
+                "correlation_integral_parameter": 1.0
             }
         }
     },
@@ -9943,9 +9950,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 4.7996,
-                "polarizability_scaling": 78.2791,
-                "correlation_integral_parameter": 0.0164
+                "dipole_scaling": 4.7666,
+                "polarizability_scaling": 78.2617,
+                "correlation_integral_parameter": 0.0145
             }
         }
     },
@@ -10072,7 +10079,7 @@
         "permittivity_record": {
             "PerturbationTheory": {
                 "dipole_scaling": 0.0,
-                "polarizability_scaling": 17.7599,
+                "polarizability_scaling": 17.7575,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -10164,9 +10171,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 7.525,
+                "dipole_scaling": 10.6838,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.0
+                "correlation_integral_parameter": 0.2324
             }
         }
     },
@@ -10319,9 +10326,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 2.7226,
-                "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.4286
+                "dipole_scaling": 2.2949,
+                "polarizability_scaling": 4.7513,
+                "correlation_integral_parameter": 0.4141
             }
         }
     },
@@ -10438,9 +10445,9 @@
         "epsilon_k": 210.6942,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 4.0616,
-                "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.9061
+                "dipole_scaling": 3.569,
+                "polarizability_scaling": 3.1315,
+                "correlation_integral_parameter": 0.6667
             }
         }
     },
@@ -10455,7 +10462,14 @@
         "molarweight": 153.961,
         "m": 2.76582,
         "sigma": 3.5012,
-        "epsilon_k": 170.66862
+        "epsilon_k": 170.66862,
+        "permittivity_record": {
+            "PerturbationTheory": {
+                "dipole_scaling": 0.3866,
+                "polarizability_scaling": 8.2841,
+                "correlation_integral_parameter": 1.0
+            }
+        }
     },
     {
         "identifier": {
@@ -10512,7 +10526,7 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 9.1425,
+                "dipole_scaling": 9.1093,
                 "polarizability_scaling": 0.0,
                 "correlation_integral_parameter": 0.0
             }
@@ -10623,9 +10637,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 6.1646,
+                "dipole_scaling": 6.1371,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 1.0
+                "correlation_integral_parameter": 0.8654
             }
         }
     },
@@ -10752,9 +10766,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 7.894,
+                "dipole_scaling": 8.4905,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.8582
+                "correlation_integral_parameter": 0.9782
             }
         }
     },
@@ -10780,9 +10794,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 9.2009,
+                "dipole_scaling": 9.1648,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.094
+                "correlation_integral_parameter": 0.1066
             }
         }
     },
@@ -10937,8 +10951,8 @@
         "mu": 1.7,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.0,
-                "polarizability_scaling": 35.7503,
+                "dipole_scaling": 0.1714,
+                "polarizability_scaling": 34.1315,
                 "correlation_integral_parameter": 1.0
             }
         }
@@ -11038,7 +11052,14 @@
         "m": 3.73837,
         "sigma": 3.13295,
         "epsilon_k": 181.33833,
-        "mu": 1.56
+        "mu": 1.56,
+        "permittivity_record": {
+            "PerturbationTheory": {
+                "dipole_scaling": 2.5468,
+                "polarizability_scaling": 17.1773,
+                "correlation_integral_parameter": 0.0395
+            }
+        }
     },
     {
         "identifier": {
@@ -11062,7 +11083,7 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 7.852,
+                "dipole_scaling": 7.9339,
                 "polarizability_scaling": 0.0,
                 "correlation_integral_parameter": 0.0
             }
@@ -11151,7 +11172,7 @@
         "mu": 1.32,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 5.4296,
+                "dipole_scaling": 5.4472,
                 "polarizability_scaling": 0.0,
                 "correlation_integral_parameter": 0.0
             }
@@ -11394,7 +11415,7 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 7.397,
+                "dipole_scaling": 7.3984,
                 "polarizability_scaling": 0.0,
                 "correlation_integral_parameter": 0.0
             }
@@ -11414,8 +11435,8 @@
         "epsilon_k": 153.31864,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.0,
-                "polarizability_scaling": 3.6561,
+                "dipole_scaling": 0.0401,
+                "polarizability_scaling": 2.7852,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -11532,9 +11553,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 17.2688,
+                "dipole_scaling": 17.2511,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.1806
+                "correlation_integral_parameter": 0.1803
             }
         }
     },
@@ -11560,9 +11581,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 13.4679,
+                "dipole_scaling": 16.8247,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.126
+                "correlation_integral_parameter": 0.2166
             }
         }
     },
@@ -11919,9 +11940,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 8.9533,
+                "dipole_scaling": 8.9989,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.1334
+                "correlation_integral_parameter": 0.1377
             }
         }
     },
@@ -11983,9 +12004,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 10.7232,
+                "dipole_scaling": 10.2165,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.12
+                "correlation_integral_parameter": 0.0
             }
         }
     },
@@ -12124,9 +12145,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 3.7889,
+                "dipole_scaling": 3.7827,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.702
+                "correlation_integral_parameter": 0.6925
             }
         }
     },
@@ -12242,9 +12263,9 @@
         "epsilon_k": 234.58027,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.0,
-                "polarizability_scaling": 17.2263,
-                "correlation_integral_parameter": 0.0
+                "dipole_scaling": 0.5594,
+                "polarizability_scaling": 12.1866,
+                "correlation_integral_parameter": 1.0
             }
         }
     },
@@ -12413,7 +12434,7 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 7.9835,
+                "dipole_scaling": 8.0536,
                 "polarizability_scaling": 0.0,
                 "correlation_integral_parameter": 0.0
             }
@@ -12888,9 +12909,9 @@
         "epsilon_k": 293.05747,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.0,
-                "polarizability_scaling": 18.0836,
-                "correlation_integral_parameter": 0.0
+                "dipole_scaling": 0.4856,
+                "polarizability_scaling": 14.6133,
+                "correlation_integral_parameter": 1.0
             }
         }
     },
@@ -12989,9 +13010,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 9.5599,
+                "dipole_scaling": 9.6855,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.0876
+                "correlation_integral_parameter": 0.1046
             }
         }
     },
@@ -13015,9 +13036,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 4.5842,
-                "polarizability_scaling": 32.5733,
-                "correlation_integral_parameter": 0.1261
+                "dipole_scaling": 5.3599,
+                "polarizability_scaling": 27.974,
+                "correlation_integral_parameter": 0.1351
             }
         }
     },
@@ -13411,9 +13432,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 3.3919,
+                "dipole_scaling": 3.3942,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.4539
+                "correlation_integral_parameter": 0.4525
             }
         }
     },
@@ -13575,8 +13596,8 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 4.4783,
-                "polarizability_scaling": 38.1071,
+                "dipole_scaling": 4.4676,
+                "polarizability_scaling": 38.1681,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -13820,7 +13841,7 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 9.2943,
+                "dipole_scaling": 9.2786,
                 "polarizability_scaling": 0.0,
                 "correlation_integral_parameter": 0.0
             }
@@ -14050,8 +14071,8 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 2.553,
-                "polarizability_scaling": 5.8596,
+                "dipole_scaling": 2.519,
+                "polarizability_scaling": 6.3787,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -14091,7 +14112,7 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 9.6107,
+                "dipole_scaling": 9.4542,
                 "polarizability_scaling": 0.0,
                 "correlation_integral_parameter": 0.0
             }
@@ -14431,7 +14452,14 @@
             {
                 "nb": 1.0
             }
-        ]
+        ],
+        "permittivity_record": {
+            "PerturbationTheory": {
+                "dipole_scaling": 3.9163,
+                "polarizability_scaling": 13.5308,
+                "correlation_integral_parameter": 0.0361
+            }
+        }
     },
     {
         "identifier": {
@@ -14654,9 +14682,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 9.1469,
+                "dipole_scaling": 9.1548,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.2104
+                "correlation_integral_parameter": 0.2082
             }
         }
     },
@@ -14728,8 +14756,8 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.0557,
-                "polarizability_scaling": 4.3556,
+                "dipole_scaling": 0.0509,
+                "polarizability_scaling": 4.4099,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -14845,8 +14873,8 @@
         "epsilon_k": 284.11055,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.0688,
-                "polarizability_scaling": 11.0693,
+                "dipole_scaling": 0.0876,
+                "polarizability_scaling": 10.8884,
                 "correlation_integral_parameter": 1.0
             }
         }
@@ -15079,9 +15107,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 5.0477,
-                "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.5262
+                "dipole_scaling": 2.8448,
+                "polarizability_scaling": 13.0943,
+                "correlation_integral_parameter": 0.1748
             }
         }
     },
@@ -15100,9 +15128,9 @@
         "mu": 2.06,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 6.2834,
+                "dipole_scaling": 5.3541,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.3485
+                "correlation_integral_parameter": 0.0
             }
         }
     },
@@ -15330,7 +15358,7 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 6.4026,
+                "dipole_scaling": 6.4661,
                 "polarizability_scaling": 0.0,
                 "correlation_integral_parameter": 0.0
             }
@@ -15737,9 +15765,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 4.3763,
-                "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.478
+                "dipole_scaling": 3.0065,
+                "polarizability_scaling": 10.4065,
+                "correlation_integral_parameter": 0.0
             }
         }
     },
@@ -15844,9 +15872,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 10.0748,
+                "dipole_scaling": 9.9707,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.1286
+                "correlation_integral_parameter": 0.1248
             }
         }
     },
@@ -16290,7 +16318,7 @@
         "permittivity_record": {
             "PerturbationTheory": {
                 "dipole_scaling": 0.0,
-                "polarizability_scaling": 38.1796,
+                "polarizability_scaling": 38.0253,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -16322,8 +16350,8 @@
         "epsilon_k": 244.83939,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.0927,
-                "polarizability_scaling": 23.4549,
+                "dipole_scaling": 0.0887,
+                "polarizability_scaling": 23.4632,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -16441,7 +16469,7 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 9.159,
+                "dipole_scaling": 8.9985,
                 "polarizability_scaling": 0.0,
                 "correlation_integral_parameter": 0.0
             }
@@ -16597,9 +16625,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 9.8053,
+                "dipole_scaling": 9.9265,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.1553
+                "correlation_integral_parameter": 0.1599
             }
         }
     },
@@ -16623,8 +16651,8 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 15.4074,
-                "polarizability_scaling": 54.0231,
+                "dipole_scaling": 15.4693,
+                "polarizability_scaling": 53.4554,
                 "correlation_integral_parameter": 0.1351
             }
         }
@@ -16847,8 +16875,8 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.0,
-                "polarizability_scaling": 9.389,
+                "dipole_scaling": 0.021,
+                "polarizability_scaling": 9.2386,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -16894,9 +16922,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 6.7558,
+                "dipole_scaling": 6.587,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.12
+                "correlation_integral_parameter": 0.0652
             }
         }
     },
@@ -17065,7 +17093,7 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 7.1985,
+                "dipole_scaling": 7.1647,
                 "polarizability_scaling": 0.0,
                 "correlation_integral_parameter": 0.0
             }
@@ -17116,9 +17144,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 4.8025,
+                "dipole_scaling": 4.5291,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.1548
+                "correlation_integral_parameter": 0.12
             }
         }
     },
@@ -17248,9 +17276,9 @@
         "mu": 2.06,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 5.7385,
-                "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.303
+                "dipole_scaling": 3.5882,
+                "polarizability_scaling": 12.594,
+                "correlation_integral_parameter": 0.0754
             }
         }
     },
@@ -17343,7 +17371,7 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 7.7299,
+                "dipole_scaling": 8.5887,
                 "polarizability_scaling": 0.0,
                 "correlation_integral_parameter": 0.0
             }
@@ -17388,9 +17416,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 7.5891,
-                "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.3284
+                "dipole_scaling": 3.0045,
+                "polarizability_scaling": 23.7726,
+                "correlation_integral_parameter": 0.0
             }
         }
     },
@@ -17427,9 +17455,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 9.8305,
-                "polarizability_scaling": 8.4145,
-                "correlation_integral_parameter": 0.2609
+                "dipole_scaling": 9.8935,
+                "polarizability_scaling": 7.871,
+                "correlation_integral_parameter": 0.2612
             }
         }
     },
@@ -17617,14 +17645,7 @@
             {
                 "nb": 4.0
             }
-        ],
-        "permittivity_record": {
-            "PerturbationTheory": {
-                "dipole_scaling": 14.6642,
-                "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.6434
-            }
-        }
+        ]
     },
     {
         "identifier": {
@@ -17646,9 +17667,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 11.0258,
+                "dipole_scaling": 11.0204,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.2794
+                "correlation_integral_parameter": 0.2795
             }
         }
     },
@@ -17711,9 +17732,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 17.9749,
+                "dipole_scaling": 17.9427,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.1719
+                "correlation_integral_parameter": 0.1711
             }
         }
     },
@@ -18078,9 +18099,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 5.9583,
-                "polarizability_scaling": 16.6909,
-                "correlation_integral_parameter": 0.395
+                "dipole_scaling": 8.6929,
+                "polarizability_scaling": 0.0,
+                "correlation_integral_parameter": 0.5376
             }
         }
     },
@@ -18131,7 +18152,7 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 8.0257,
+                "dipole_scaling": 7.8796,
                 "polarizability_scaling": 0.0,
                 "correlation_integral_parameter": 0.0
             }
@@ -18190,9 +18211,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 5.194,
+                "dipole_scaling": 5.2607,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.1311
+                "correlation_integral_parameter": 0.132
             }
         }
     },
@@ -18288,8 +18309,8 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 2.1041,
-                "polarizability_scaling": 14.7643,
+                "dipole_scaling": 2.102,
+                "polarizability_scaling": 14.7918,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -18360,9 +18381,9 @@
         "epsilon_k": 287.70609,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.0,
-                "polarizability_scaling": 18.8533,
-                "correlation_integral_parameter": 0.0
+                "dipole_scaling": 0.2944,
+                "polarizability_scaling": 16.4614,
+                "correlation_integral_parameter": 1.0
             }
         }
     },
@@ -18473,7 +18494,7 @@
         "permittivity_record": {
             "PerturbationTheory": {
                 "dipole_scaling": 0.0,
-                "polarizability_scaling": 41.9032,
+                "polarizability_scaling": 41.5062,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -18658,9 +18679,9 @@
         "mu": 1.87,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 3.611,
-                "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.2695
+                "dipole_scaling": 2.8156,
+                "polarizability_scaling": 6.8138,
+                "correlation_integral_parameter": 0.2436
             }
         }
     },
@@ -18705,7 +18726,7 @@
         "permittivity_record": {
             "PerturbationTheory": {
                 "dipole_scaling": 0.0,
-                "polarizability_scaling": 15.7941,
+                "polarizability_scaling": 15.7541,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -18817,9 +18838,9 @@
         "mu": 1.72,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 5.0932,
-                "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.9337
+                "dipole_scaling": 3.2205,
+                "polarizability_scaling": 12.4157,
+                "correlation_integral_parameter": 0.7353
             }
         }
     },
@@ -18892,7 +18913,7 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 3.2451,
+                "dipole_scaling": 3.2398,
                 "polarizability_scaling": 0.0,
                 "correlation_integral_parameter": 0.0
             }
@@ -19335,9 +19356,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 8.7734,
+                "dipole_scaling": 8.7539,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.214
+                "correlation_integral_parameter": 0.2107
             }
         }
     },
@@ -19402,7 +19423,14 @@
         "m": 3.64005,
         "sigma": 3.21838,
         "epsilon_k": 177.56548,
-        "mu": 1.17
+        "mu": 1.17,
+        "permittivity_record": {
+            "PerturbationTheory": {
+                "dipole_scaling": 2.6885,
+                "polarizability_scaling": 11.7004,
+                "correlation_integral_parameter": 0.0
+            }
+        }
     },
     {
         "identifier": {
@@ -19498,7 +19526,7 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 9.6284,
+                "dipole_scaling": 9.6195,
                 "polarizability_scaling": 0.0,
                 "correlation_integral_parameter": 0.0
             }
@@ -19655,7 +19683,7 @@
         "permittivity_record": {
             "PerturbationTheory": {
                 "dipole_scaling": 0.0,
-                "polarizability_scaling": 16.5817,
+                "polarizability_scaling": 16.5873,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -19767,8 +19795,8 @@
         "epsilon_k": 262.58452,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 3.5151,
-                "polarizability_scaling": 18.2825,
+                "dipole_scaling": 3.5443,
+                "polarizability_scaling": 18.0794,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -20051,9 +20079,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 6.3142,
+                "dipole_scaling": 7.418,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.0
+                "correlation_integral_parameter": 0.12
             }
         }
     },
@@ -20096,7 +20124,7 @@
         "permittivity_record": {
             "PerturbationTheory": {
                 "dipole_scaling": 0.0,
-                "polarizability_scaling": 30.9491,
+                "polarizability_scaling": 30.9003,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -20261,8 +20289,8 @@
         "epsilon_k": 280.36899,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.0834,
-                "polarizability_scaling": 10.9745,
+                "dipole_scaling": 0.1118,
+                "polarizability_scaling": 10.737,
                 "correlation_integral_parameter": 1.0
             }
         }
@@ -20935,9 +20963,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 13.9382,
+                "dipole_scaling": 13.996,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.2209
+                "correlation_integral_parameter": 0.2212
             }
         }
     },
@@ -21059,9 +21087,9 @@
         "mu": 0.92,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 2.4075,
-                "polarizability_scaling": 9.0201,
-                "correlation_integral_parameter": 0.7894
+                "dipole_scaling": 2.0148,
+                "polarizability_scaling": 10.5916,
+                "correlation_integral_parameter": 0.0
             }
         }
     },
@@ -21293,9 +21321,9 @@
         "epsilon_k": 240.54294,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.0,
-                "polarizability_scaling": 12.3839,
-                "correlation_integral_parameter": 0.0
+                "dipole_scaling": 0.4938,
+                "polarizability_scaling": 8.2138,
+                "correlation_integral_parameter": 1.0
             }
         }
     },
@@ -21321,9 +21349,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 10.1942,
+                "dipole_scaling": 10.1656,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.1281
+                "correlation_integral_parameter": 0.1275
             }
         }
     },
@@ -21368,9 +21396,9 @@
         "mu": 2.24,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 7.3411,
-                "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.4319
+                "dipole_scaling": 3.7256,
+                "polarizability_scaling": 24.455,
+                "correlation_integral_parameter": 0.2353
             }
         }
     },
@@ -21464,9 +21492,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 7.4655,
+                "dipole_scaling": 7.6987,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.6762
+                "correlation_integral_parameter": 0.7079
             }
         }
     },
@@ -21525,9 +21553,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 7.9443,
+                "dipole_scaling": 8.247,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.0
+                "correlation_integral_parameter": 0.0661
             }
         }
     },
@@ -22260,9 +22288,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 14.6763,
+                "dipole_scaling": 15.0455,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.1276
+                "correlation_integral_parameter": 0.1355
             }
         }
     },
@@ -22445,7 +22473,7 @@
         "permittivity_record": {
             "PerturbationTheory": {
                 "dipole_scaling": 0.0,
-                "polarizability_scaling": 17.0677,
+                "polarizability_scaling": 17.0827,
                 "correlation_integral_parameter": 1.0
             }
         }
@@ -22472,7 +22500,7 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 2.8772,
+                "dipole_scaling": 2.8742,
                 "polarizability_scaling": 0.0,
                 "correlation_integral_parameter": 0.0
             }
@@ -22532,9 +22560,9 @@
         "mu": 1.69,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 2.9301,
-                "polarizability_scaling": 12.9205,
-                "correlation_integral_parameter": 0.5046
+                "dipole_scaling": 3.2055,
+                "polarizability_scaling": 11.1666,
+                "correlation_integral_parameter": 0.554
             }
         }
     },
@@ -22592,7 +22620,7 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 7.6278,
+                "dipole_scaling": 7.6247,
                 "polarizability_scaling": 0.0,
                 "correlation_integral_parameter": 0.0
             }
@@ -22673,9 +22701,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 3.1469,
-                "polarizability_scaling": 12.8022,
-                "correlation_integral_parameter": 0.5187
+                "dipole_scaling": 3.1444,
+                "polarizability_scaling": 12.9641,
+                "correlation_integral_parameter": 0.5162
             }
         }
     },
@@ -22707,9 +22735,9 @@
         "mu": 1.6,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 3.1156,
-                "polarizability_scaling": 7.0817,
-                "correlation_integral_parameter": 0.2741
+                "dipole_scaling": 3.2392,
+                "polarizability_scaling": 6.3047,
+                "correlation_integral_parameter": 0.2802
             }
         }
     },
@@ -22929,9 +22957,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.0,
-                "polarizability_scaling": 49.4603,
-                "correlation_integral_parameter": 0.0
+                "dipole_scaling": 8.3556,
+                "polarizability_scaling": 0.0,
+                "correlation_integral_parameter": 0.8375
             }
         }
     },
@@ -22970,9 +22998,9 @@
         "epsilon_k": 174.59547,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 1.9904,
-                "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.12
+                "dipole_scaling": 1.2007,
+                "polarizability_scaling": 7.7131,
+                "correlation_integral_parameter": 0.9025
             }
         }
     },
@@ -23133,9 +23161,9 @@
         "mu": 2.014,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 5.5289,
+                "dipole_scaling": 5.5416,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.3074
+                "correlation_integral_parameter": 0.3096
             }
         }
     },
@@ -23167,9 +23195,9 @@
         "mu": 1.65,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 3.3457,
-                "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.1544
+                "dipole_scaling": 3.0166,
+                "polarizability_scaling": 3.6819,
+                "correlation_integral_parameter": 0.1411
             }
         }
     },
@@ -23325,7 +23353,7 @@
         "permittivity_record": {
             "PerturbationTheory": {
                 "dipole_scaling": 0.0,
-                "polarizability_scaling": 20.2309,
+                "polarizability_scaling": 20.2235,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -23372,9 +23400,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 11.6087,
+                "dipole_scaling": 11.614,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.1437
+                "correlation_integral_parameter": 0.1441
             }
         }
     },
@@ -23871,9 +23899,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 6.1356,
+                "dipole_scaling": 6.3546,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.9925
+                "correlation_integral_parameter": 0.9928
             }
         }
     },
@@ -24257,9 +24285,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 3.9591,
-                "polarizability_scaling": 18.2154,
-                "correlation_integral_parameter": 0.9333
+                "dipole_scaling": 6.0874,
+                "polarizability_scaling": 0.0,
+                "correlation_integral_parameter": 0.8959
             }
         }
     },
@@ -24298,9 +24326,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 12.3688,
+                "dipole_scaling": 12.404,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.0974
+                "correlation_integral_parameter": 0.1008
             }
         }
     },
@@ -24350,9 +24378,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 13.0311,
+                "dipole_scaling": 13.055,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.2373
+                "correlation_integral_parameter": 0.2386
             }
         }
     },
@@ -24489,9 +24517,9 @@
         "epsilon_k": 202.49941,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.0,
-                "polarizability_scaling": 14.1267,
-                "correlation_integral_parameter": 0.0
+                "dipole_scaling": 0.2824,
+                "polarizability_scaling": 11.535,
+                "correlation_integral_parameter": 1.0
             }
         }
     },
@@ -24562,7 +24590,7 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 5.7661,
+                "dipole_scaling": 5.7867,
                 "polarizability_scaling": 0.0,
                 "correlation_integral_parameter": 1.0
             }
@@ -24615,7 +24643,7 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 9.7204,
+                "dipole_scaling": 9.7093,
                 "polarizability_scaling": 0.0,
                 "correlation_integral_parameter": 0.0
             }
@@ -24947,9 +24975,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 9.2494,
+                "dipole_scaling": 9.1105,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.1171
+                "correlation_integral_parameter": 0.1113
             }
         }
     },
@@ -25258,8 +25286,8 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 4.6363,
-                "polarizability_scaling": 0.0,
+                "dipole_scaling": 0.0,
+                "polarizability_scaling": 44.1464,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -25413,7 +25441,7 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 8.5925,
+                "dipole_scaling": 8.5775,
                 "polarizability_scaling": 0.0,
                 "correlation_integral_parameter": 0.0
             }
@@ -26355,9 +26383,9 @@
         "mu": 1.01,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 1.9729,
-                "polarizability_scaling": 7.7983,
-                "correlation_integral_parameter": 0.4663
+                "dipole_scaling": 1.5953,
+                "polarizability_scaling": 10.0018,
+                "correlation_integral_parameter": 0.2203
             }
         }
     },
@@ -26389,7 +26417,7 @@
         "permittivity_record": {
             "PerturbationTheory": {
                 "dipole_scaling": 0.0,
-                "polarizability_scaling": 14.3813,
+                "polarizability_scaling": 14.3528,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -26455,8 +26483,8 @@
         "epsilon_k": 184.87384,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.0,
-                "polarizability_scaling": 28.5434,
+                "dipole_scaling": 2.6609,
+                "polarizability_scaling": 6.9992,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -26497,7 +26525,7 @@
         "permittivity_record": {
             "PerturbationTheory": {
                 "dipole_scaling": 0.0,
-                "polarizability_scaling": 41.5211,
+                "polarizability_scaling": 41.6117,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -26556,8 +26584,8 @@
         "epsilon_k": 207.73187,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.1752,
-                "polarizability_scaling": 6.0385,
+                "dipole_scaling": 0.1463,
+                "polarizability_scaling": 6.3345,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -26755,7 +26783,7 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 8.2716,
+                "dipole_scaling": 8.2329,
                 "polarizability_scaling": 0.0,
                 "correlation_integral_parameter": 0.0
             }
@@ -26901,9 +26929,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 9.1298,
-                "polarizability_scaling": 30.8405,
-                "correlation_integral_parameter": 0.134
+                "dipole_scaling": 9.3234,
+                "polarizability_scaling": 29.5484,
+                "correlation_integral_parameter": 0.1353
             }
         }
     },
@@ -26940,9 +26968,9 @@
         "epsilon_k": 312.30087,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 5.8024,
-                "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.7685
+                "dipole_scaling": 3.208,
+                "polarizability_scaling": 17.1034,
+                "correlation_integral_parameter": 0.5351
             }
         }
     },
@@ -27084,9 +27112,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 3.1967,
+                "dipole_scaling": 3.196,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.2458
+                "correlation_integral_parameter": 0.246
             }
         }
     },
@@ -27194,9 +27222,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 8.3625,
+                "dipole_scaling": 8.2971,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.1509
+                "correlation_integral_parameter": 0.1506
             }
         }
     },
@@ -27747,9 +27775,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 8.3798,
-                "polarizability_scaling": 13.624,
-                "correlation_integral_parameter": 0.2217
+                "dipole_scaling": 8.5682,
+                "polarizability_scaling": 12.1595,
+                "correlation_integral_parameter": 0.2226
             }
         }
     },
@@ -27823,9 +27851,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 14.7615,
+                "dipole_scaling": 14.8365,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.0557
+                "correlation_integral_parameter": 0.0659
             }
         }
     },
@@ -28248,9 +28276,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 13.644,
+                "dipole_scaling": 13.8878,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.1299
+                "correlation_integral_parameter": 0.1342
             }
         }
     },
@@ -28287,9 +28315,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 3.6318,
-                "polarizability_scaling": 33.5917,
-                "correlation_integral_parameter": 0.0499
+                "dipole_scaling": 5.5302,
+                "polarizability_scaling": 26.6651,
+                "correlation_integral_parameter": 0.129
             }
         }
     },
@@ -28350,9 +28378,9 @@
         "mu": 2.21,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 6.5635,
-                "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.7653
+                "dipole_scaling": 2.1251,
+                "polarizability_scaling": 26.6367,
+                "correlation_integral_parameter": 0.294
             }
         }
     },
@@ -28419,7 +28447,14 @@
         "m": 3.53879,
         "sigma": 3.30922,
         "epsilon_k": 162.80876,
-        "mu": 1.46
+        "mu": 1.46,
+        "permittivity_record": {
+            "PerturbationTheory": {
+                "dipole_scaling": 3.466,
+                "polarizability_scaling": 2.4592,
+                "correlation_integral_parameter": 0.4066
+            }
+        }
     },
     {
         "identifier": {
@@ -28569,7 +28604,14 @@
         "molarweight": 28.031,
         "m": 1.59196,
         "sigma": 3.40769,
-        "epsilon_k": 177.32571
+        "epsilon_k": 177.32571,
+        "permittivity_record": {
+            "PerturbationTheory": {
+                "dipole_scaling": 0.0,
+                "polarizability_scaling": 4.3912,
+                "correlation_integral_parameter": 0.0
+            }
+        }
     },
     {
         "identifier": {
@@ -28655,7 +28697,14 @@
         "molarweight": 148.031,
         "m": 4.03959,
         "sigma": 3.25784,
-        "epsilon_k": 189.37775
+        "epsilon_k": 189.37775,
+        "permittivity_record": {
+            "PerturbationTheory": {
+                "dipole_scaling": 7.4605,
+                "polarizability_scaling": 6.7172,
+                "correlation_integral_parameter": 0.0719
+            }
+        }
     },
     {
         "identifier": {
@@ -29045,9 +29094,9 @@
         "mu": 2.08,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 3.7451,
-                "polarizability_scaling": 15.4195,
-                "correlation_integral_parameter": 0.3731
+                "dipole_scaling": 3.7477,
+                "polarizability_scaling": 15.3925,
+                "correlation_integral_parameter": 0.3732
             }
         }
     },
@@ -29143,9 +29192,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 14.9274,
-                "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.1224
+                "dipole_scaling": 6.6742,
+                "polarizability_scaling": 44.6782,
+                "correlation_integral_parameter": 0.0953
             }
         }
     },
@@ -29201,8 +29250,8 @@
         "epsilon_k": 245.06739,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.0746,
-                "polarizability_scaling": 10.7673,
+                "dipole_scaling": 0.0,
+                "polarizability_scaling": 11.5243,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -29242,9 +29291,9 @@
         "mu": 1.08,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 1.3657,
+                "dipole_scaling": 1.4781,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.3984
+                "correlation_integral_parameter": 0.4319
             }
         }
     },
@@ -29302,7 +29351,7 @@
         "permittivity_record": {
             "PerturbationTheory": {
                 "dipole_scaling": 0.0,
-                "polarizability_scaling": 20.7446,
+                "polarizability_scaling": 20.7674,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -29372,7 +29421,7 @@
         "permittivity_record": {
             "PerturbationTheory": {
                 "dipole_scaling": 0.0,
-                "polarizability_scaling": 10.4603,
+                "polarizability_scaling": 10.4621,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -29576,9 +29625,9 @@
         "mu": 1.56,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 4.7474,
-                "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 1.0
+                "dipole_scaling": 1.6534,
+                "polarizability_scaling": 19.1052,
+                "correlation_integral_parameter": 0.0
             }
         }
     },
@@ -29694,7 +29743,14 @@
         "m": 3.07064,
         "sigma": 3.13545,
         "epsilon_k": 154.7744,
-        "mu": 1.54
+        "mu": 1.54,
+        "permittivity_record": {
+            "PerturbationTheory": {
+                "dipole_scaling": 2.9815,
+                "polarizability_scaling": 5.0556,
+                "correlation_integral_parameter": 0.1867
+            }
+        }
     },
     {
         "identifier": {
@@ -29715,9 +29771,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.0,
-                "polarizability_scaling": 1.8002,
-                "correlation_integral_parameter": 0.0
+                "dipole_scaling": 0.0052,
+                "polarizability_scaling": 1.6338,
+                "correlation_integral_parameter": 1.0
             }
         }
     },
@@ -30029,9 +30085,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 10.1018,
+                "dipole_scaling": 9.838,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.1682
+                "correlation_integral_parameter": 0.1458
             }
         }
     },
@@ -30123,8 +30179,8 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.3801,
-                "polarizability_scaling": 9.712,
+                "dipole_scaling": 0.3791,
+                "polarizability_scaling": 9.7235,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -30196,9 +30252,9 @@
         "epsilon_k": 241.43398,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.0,
-                "polarizability_scaling": 16.3527,
-                "correlation_integral_parameter": 0.0
+                "dipole_scaling": 0.014,
+                "polarizability_scaling": 16.2098,
+                "correlation_integral_parameter": 1.0
             }
         }
     },
@@ -30236,9 +30292,9 @@
         "mu": 1.0,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 1.4562,
-                "polarizability_scaling": 18.2326,
-                "correlation_integral_parameter": 1.0
+                "dipole_scaling": 0.3939,
+                "polarizability_scaling": 21.6118,
+                "correlation_integral_parameter": 0.0
             }
         }
     },
@@ -30295,9 +30351,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 5.6894,
-                "polarizability_scaling": 12.0979,
-                "correlation_integral_parameter": 0.1317
+                "dipole_scaling": 7.25,
+                "polarizability_scaling": 0.0,
+                "correlation_integral_parameter": 0.1445
             }
         }
     },
@@ -30604,7 +30660,7 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 23.6095,
+                "dipole_scaling": 23.5874,
                 "polarizability_scaling": 0.0,
                 "correlation_integral_parameter": 0.0
             }
@@ -30702,9 +30758,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 4.6841,
-                "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.4212
+                "dipole_scaling": 4.0137,
+                "polarizability_scaling": 5.1453,
+                "correlation_integral_parameter": 0.3971
             }
         }
     },
@@ -30920,9 +30976,9 @@
         "epsilon_k": 217.60377,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.0148,
-                "polarizability_scaling": 8.5225,
-                "correlation_integral_parameter": 0.0
+                "dipole_scaling": 0.0199,
+                "polarizability_scaling": 8.5147,
+                "correlation_integral_parameter": 1.0
             }
         }
     },
@@ -31112,7 +31168,7 @@
         "permittivity_record": {
             "PerturbationTheory": {
                 "dipole_scaling": 0.0,
-                "polarizability_scaling": 21.3087,
+                "polarizability_scaling": 21.2836,
                 "correlation_integral_parameter": 1.0
             }
         }
@@ -31335,9 +31391,9 @@
         "mu": 1.458,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 3.5128,
-                "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.3767
+                "dipole_scaling": 2.5131,
+                "polarizability_scaling": 5.9337,
+                "correlation_integral_parameter": 0.1398
             }
         }
     },
@@ -31361,7 +31417,7 @@
         "permittivity_record": {
             "PerturbationTheory": {
                 "dipole_scaling": 0.0,
-                "polarizability_scaling": 19.2207,
+                "polarizability_scaling": 19.212,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -31419,9 +31475,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 11.5743,
-                "polarizability_scaling": 28.8642,
-                "correlation_integral_parameter": 0.2047
+                "dipole_scaling": 11.8115,
+                "polarizability_scaling": 27.5167,
+                "correlation_integral_parameter": 0.2062
             }
         }
     },
@@ -31591,9 +31647,9 @@
         "mu": 1.7,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 2.5111,
-                "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 1.0
+                "dipole_scaling": 0.0,
+                "polarizability_scaling": 20.0159,
+                "correlation_integral_parameter": 0.0
             }
         }
     },
@@ -31617,9 +31673,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 3.9368,
-                "polarizability_scaling": 13.0992,
-                "correlation_integral_parameter": 0.2541
+                "dipole_scaling": 4.0523,
+                "polarizability_scaling": 12.1,
+                "correlation_integral_parameter": 0.2623
             }
         }
     },
@@ -31757,7 +31813,7 @@
         "permittivity_record": {
             "PerturbationTheory": {
                 "dipole_scaling": 0.0,
-                "polarizability_scaling": 9.4971,
+                "polarizability_scaling": 9.4733,
                 "correlation_integral_parameter": 1.0
             }
         }
@@ -32000,7 +32056,7 @@
         "permittivity_record": {
             "PerturbationTheory": {
                 "dipole_scaling": 0.0,
-                "polarizability_scaling": 29.2098,
+                "polarizability_scaling": 32.7867,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -32418,9 +32474,9 @@
         "mu": 1.7,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 4.9296,
-                "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.8404
+                "dipole_scaling": 2.2131,
+                "polarizability_scaling": 16.9531,
+                "correlation_integral_parameter": 0.375
             }
         }
     },
@@ -32881,14 +32937,7 @@
             {
                 "nb": 2.0
             }
-        ],
-        "permittivity_record": {
-            "PerturbationTheory": {
-                "dipole_scaling": 4.4909,
-                "polarizability_scaling": 12.8686,
-                "correlation_integral_parameter": 1.0
-            }
-        }
+        ]
     },
     {
         "identifier": {
@@ -32981,7 +33030,7 @@
         "permittivity_record": {
             "PerturbationTheory": {
                 "dipole_scaling": 0.0,
-                "polarizability_scaling": 16.0078,
+                "polarizability_scaling": 16.0344,
                 "correlation_integral_parameter": 0.0
             }
         }
@@ -33107,7 +33156,7 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 9.1605,
+                "dipole_scaling": 9.1282,
                 "polarizability_scaling": 0.0,
                 "correlation_integral_parameter": 0.0
             }
@@ -33350,9 +33399,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 15.3577,
+                "dipole_scaling": 15.5424,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.1592
+                "correlation_integral_parameter": 0.1638
             }
         }
     },
@@ -33902,7 +33951,14 @@
             {
                 "nb": 1.0
             }
-        ]
+        ],
+        "permittivity_record": {
+            "PerturbationTheory": {
+                "dipole_scaling": 4.2303,
+                "polarizability_scaling": 20.889,
+                "correlation_integral_parameter": 0.4482
+            }
+        }
     },
     {
         "identifier": {
@@ -33991,9 +34047,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 2.5498,
-                "polarizability_scaling": 3.2203,
-                "correlation_integral_parameter": 0.2361
+                "dipole_scaling": 2.9194,
+                "polarizability_scaling": 0.0,
+                "correlation_integral_parameter": 0.2385
             }
         }
     },
@@ -34192,9 +34248,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 22.095,
+                "dipole_scaling": 22.1186,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.1242
+                "correlation_integral_parameter": 0.1243
             }
         }
     },
@@ -34215,14 +34271,7 @@
             {
                 "nb": 4.0
             }
-        ],
-        "permittivity_record": {
-            "PerturbationTheory": {
-                "dipole_scaling": 8.0624,
-                "polarizability_scaling": 19.7636,
-                "correlation_integral_parameter": 0.3701
-            }
-        }
+        ]
     },
     {
         "identifier": {
@@ -34327,9 +34376,9 @@
         "epsilon_k": 175.92411,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 5.8285,
-                "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.308
+                "dipole_scaling": 4.8782,
+                "polarizability_scaling": 5.729,
+                "correlation_integral_parameter": 0.1884
             }
         }
     },
@@ -34375,7 +34424,7 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 9.1479,
+                "dipole_scaling": 9.151,
                 "polarizability_scaling": 0.0,
                 "correlation_integral_parameter": 0.0
             }
@@ -34567,14 +34616,7 @@
             {
                 "nb": 4.0
             }
-        ],
-        "permittivity_record": {
-            "PerturbationTheory": {
-                "dipole_scaling": 13.1473,
-                "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.5543
-            }
-        }
+        ]
     },
     {
         "identifier": {
@@ -34780,9 +34822,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 14.9962,
+                "dipole_scaling": 14.9822,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.535
+                "correlation_integral_parameter": 0.5338
             }
         }
     },
@@ -35279,9 +35321,9 @@
         "epsilon_k": 238.22957,
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 0.0,
-                "polarizability_scaling": 18.9959,
-                "correlation_integral_parameter": 0.0
+                "dipole_scaling": 0.4245,
+                "polarizability_scaling": 13.2417,
+                "correlation_integral_parameter": 1.0
             }
         }
     },
@@ -35521,9 +35563,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 11.3566,
-                "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.3069
+                "dipole_scaling": 4.9206,
+                "polarizability_scaling": 41.9898,
+                "correlation_integral_parameter": 0.1858
             }
         }
     },
@@ -35700,7 +35742,7 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 4.7722,
+                "dipole_scaling": 5.1942,
                 "polarizability_scaling": 0.0,
                 "correlation_integral_parameter": 0.0
             }
@@ -35728,9 +35770,9 @@
         ],
         "permittivity_record": {
             "PerturbationTheory": {
-                "dipole_scaling": 9.6055,
+                "dipole_scaling": 10.5173,
                 "polarizability_scaling": 0.0,
-                "correlation_integral_parameter": 0.12
+                "correlation_integral_parameter": 0.3708
             }
         }
     },
