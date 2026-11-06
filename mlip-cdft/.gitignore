@@ -1,0 +1,7 @@
+# run outputs (regenerate with the example scripts)
+__pycache__/
+*.out
+*.log
+*.npz
+*.npy
+*.json.tmp

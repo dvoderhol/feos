@@ -1,0 +1,9 @@
+# NIST/ARPA-E ISODB isotherm 10.1002Aic.14467.Isotherm94
+# DOI 10.1002/Aic.14467  adsorbent Mg-MOF-74  T 313 K
+# pressure [bar], uptake [mmol/g], isotherm_type ''
+0.053719,0.342975
+0.0950413,0.651895
+0.247934,1.50869
+0.495868,3.01738
+0.752066,4.14648
+1.00413,4.89641

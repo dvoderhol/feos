@@ -1,0 +1,72 @@
+{
+ "T_K": 298.0,
+ "n_coarse": [
+  "12",
+  "27",
+  "27"
+ ],
+ "n_fine": [
+  23,
+  51,
+  51
+ ],
+ "K_H_coarse": 1.1098113238495691e-05,
+ "K_H_fine": 1.444775454897691e-05,
+ "K_H_feos": 1.4447754552185952e-05,
+ "pressure_bar": [
+  0.09999999999999996,
+  0.9999999999999999,
+  NaN,
+  NaN,
+  NaN,
+  NaN,
+  NaN,
+  NaN,
+  NaN
+ ],
+ "molecules_per_cell": [
+  0.10604588593110072,
+  1.1386786364724815,
+  NaN,
+  NaN,
+  NaN,
+  NaN,
+  NaN,
+  NaN,
+  NaN
+ ],
+ "mol_per_kg": [
+  0.1456426185206749,
+  1.5638526361800797,
+  NaN,
+  NaN,
+  NaN,
+  NaN,
+  NaN,
+  NaN,
+  NaN
+ ],
+ "vext_info": {
+  "n_grid": 8748,
+  "n_irreducible": 4374,
+  "n_symmetry_ops": 2,
+  "n_evaluated_points": 2359,
+  "n_orientations": 12,
+  "n_insertions": 28308,
+  "n_below_u_min": 0,
+  "r_ref_min": 2.0,
+  "r_atom_min": 1.4,
+  "u_min": -1.5,
+  "E_host": -898.0582885742188,
+  "E_guest": -25.00682830810547,
+  "wall_s": 127.5,
+  "model": "uMOF-MH",
+  "spacing": 0.57,
+  "inversion_shift": [
+   -0.005840116717167443,
+   -0.004303709180987297,
+   -0.0028937883975423684
+  ],
+  "framework_mass_amu": 728.124
+ }
+}
