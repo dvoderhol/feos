@@ -8,11 +8,54 @@ use crate::residual::ResidualModel;
 use crate::state::PyState;
 #[cfg(feature = "dft")]
 use feos::epcpsaft::EPcpSaftFunctional;
-use feos::epcpsaft::{DQVariants, EPcpSaft, EPcpSaftOptions};
+use feos::epcpsaft::{DQVariants, EPcpSaft, EPcpSaftOptions, EPcpSaftVariants, MsaPacking};
 use feos_core::{EquationOfState, ReferenceSystem, ResidualDyn, StateHD};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use std::sync::Arc;
+
+fn epcpsaft_variant(epcpsaft_variant: &str) -> PyResult<EPcpSaftVariants> {
+    match epcpsaft_variant {
+        "dh" => Ok(EPcpSaftVariants::DebyeHueckel),
+        "msa" => Ok(EPcpSaftVariants::MeanSphericalApproximation),
+        _ => Err(PyErr::new::<PyValueError, _>(
+            r#"epcpsaft_variant must be "dh" or "msa""#,
+        )),
+    }
+}
+
+/// ePCP-SAFT options from the keyword arguments shared by all Python constructors.
+#[expect(clippy::too_many_arguments)]
+pub(crate) fn epcpsaft_options(
+    max_eta: f64,
+    max_iter_cross_assoc: usize,
+    tol_cross_assoc: f64,
+    dq_variant: &str,
+    epcpsaft_variant: &str,
+    msa_packing: &str,
+    born_delta_cation: f64,
+    born_delta_anion: f64,
+) -> PyResult<EPcpSaftOptions> {
+    let msa_packing = match msa_packing {
+        "ions" => MsaPacking::Ions,
+        "total" => MsaPacking::Total,
+        _ => {
+            return Err(PyErr::new::<PyValueError, _>(
+                r#"msa_packing must be "ions" or "total""#,
+            ));
+        }
+    };
+    Ok(EPcpSaftOptions {
+        max_eta,
+        max_iter_cross_assoc,
+        tol_cross_assoc,
+        dq_variant: self::dq_variant(dq_variant)?,
+        epcpsaft_variant: self::epcpsaft_variant(epcpsaft_variant)?,
+        msa_packing,
+        born_delta_cation,
+        born_delta_anion,
+    })
+}
 
 fn dq_variant(dq_variant: &str) -> PyResult<DQVariants> {
     match dq_variant {
@@ -41,6 +84,12 @@ impl PyEquationOfState {
     ///     Tolerance for convergence of cross association. Defaults to 1e-10.
     /// dq_variant : "dq35" | "dq44", optional
     ///     Combination rule used in the dipole/quadrupole term. Defaults to "dq35"
+    /// epcpsaft_variant : "dh" | "msa", optional
+    ///     Term for the electrostatic interactions between ions: Debye-Hückel ("dh") or mean
+    ///     spherical approximation of the primitive model ("msa"). Defaults to "dh".
+    /// msa_packing : "ions" | "total", optional
+    ///     Species in the packing term of the MSA: ions only (primitive model) or all species
+    ///     (excluded volume of the solvent included). Defaults to "ions".
     /// born_delta_cation : float, optional
     ///     Correction added to the diameter of all cations in the Born term (in Angstrom). Defaults to 0.
     /// born_delta_anion : float, optional
@@ -53,26 +102,31 @@ impl PyEquationOfState {
     ///     states.
     #[staticmethod]
     #[pyo3(
-        signature = (parameters, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", born_delta_cation=0.0, born_delta_anion=0.0),
-        text_signature = r#"(parameters, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", born_delta_cation=0.0, born_delta_anion=0.0)"#
+        signature = (parameters, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", epcpsaft_variant="dh", msa_packing="ions", born_delta_cation=0.0, born_delta_anion=0.0),
+        text_signature = r#"(parameters, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", epcpsaft_variant="dh", msa_packing="ions", born_delta_cation=0.0, born_delta_anion=0.0)"#
     )]
+    #[expect(clippy::too_many_arguments)]
     pub fn epcpsaft(
         parameters: &Bound<'_, PyAny>,
         max_eta: f64,
         max_iter_cross_assoc: usize,
         tol_cross_assoc: f64,
         dq_variant: &str,
+        epcpsaft_variant: &str,
+        msa_packing: &str,
         born_delta_cation: f64,
         born_delta_anion: f64,
     ) -> PyResult<Self> {
-        let options = EPcpSaftOptions {
+        let options = epcpsaft_options(
             max_eta,
             max_iter_cross_assoc,
             tol_cross_assoc,
-            dq_variant: self::dq_variant(dq_variant)?,
+            dq_variant,
+            epcpsaft_variant,
+            msa_packing,
             born_delta_cation,
             born_delta_anion,
-        };
+        )?;
         let parameters = if let Ok(parameters) = parameters.extract::<PyParameters>() {
             parameters.try_convert()
         } else if let Ok(parameters) = parameters.extract::<PyGcParameters>() {

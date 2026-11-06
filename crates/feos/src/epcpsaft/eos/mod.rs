@@ -19,9 +19,13 @@ mod epcpsaft_binary;
 mod epcpsaft_pure;
 pub(crate) mod hard_chain;
 mod ionic;
+mod msa;
 pub(crate) mod permittivity;
 pub(crate) mod polar;
-pub use ad::{EPcpSaftAD, EPcpSaftParameter};
+pub use ad::{
+    ELECTROLYTE_GRADIENT_CHUNK, EPcpSaftAD, EPcpSaftParameter, ElectrolyteDerivatives,
+    ValueGradient, electrolyte_properties_derivatives,
+};
 use association::Association;
 use born::Born;
 use dispersion::Dispersion;
@@ -29,8 +33,20 @@ pub use epcpsaft_binary::EPcpSaftBinary;
 pub use epcpsaft_pure::EPcpSaftPure;
 use hard_chain::HardChain;
 use ionic::Ionic;
+use msa::Msa;
+pub use msa::MsaPacking;
 pub use polar::DQVariants;
 use polar::{Dipole, DipoleQuadrupole, Quadrupole};
+
+/// Implemented variants of the ePCP-SAFT equation of state: the term for the electrostatic
+/// interactions between ions.
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub enum EPcpSaftVariants {
+    /// Debye-Hückel term (as in ePC-SAFT).
+    DebyeHueckel,
+    /// Mean spherical approximation of the primitive model (Blum 1975).
+    MeanSphericalApproximation,
+}
 
 /// Customization options for the ePCP-SAFT equation of state and functional.
 #[derive(Copy, Clone)]
@@ -39,6 +55,10 @@ pub struct EPcpSaftOptions {
     pub max_iter_cross_assoc: usize,
     pub tol_cross_assoc: f64,
     pub dq_variant: DQVariants,
+    /// Term for the electrostatic interactions between ions
+    pub epcpsaft_variant: EPcpSaftVariants,
+    /// Species in the packing term of the MSA (only for [EPcpSaftVariants::MeanSphericalApproximation])
+    pub msa_packing: MsaPacking,
     /// Correction added to the diameter of all cations in the Born term (Angstrom)
     pub born_delta_cation: f64,
     /// Correction added to the diameter of all anions in the Born term (Angstrom)
@@ -52,6 +72,8 @@ impl Default for EPcpSaftOptions {
             max_iter_cross_assoc: 50,
             tol_cross_assoc: 1e-10,
             dq_variant: DQVariants::DQ35,
+            epcpsaft_variant: EPcpSaftVariants::DebyeHueckel,
+            msa_packing: MsaPacking::Ions,
             born_delta_cation: 0.0,
             born_delta_anion: 0.0,
         }
@@ -162,10 +184,21 @@ impl EPcpSaft {
         if self.ionic {
             let permittivity = p.permittivity(state).unwrap();
             let bjerrum_length = p.bjerrum_length(state.temperature, permittivity);
-            v.push((
-                "Ionic",
-                Ionic.helmholtz_energy_density(p, state, &d, bjerrum_length),
-            ));
+            v.push(match self.options.epcpsaft_variant {
+                EPcpSaftVariants::DebyeHueckel => (
+                    "Ionic",
+                    Ionic.helmholtz_energy_density(p, state, &d, bjerrum_length),
+                ),
+                EPcpSaftVariants::MeanSphericalApproximation => (
+                    "MSA",
+                    Msa(self.options.msa_packing).helmholtz_energy_density(
+                        p,
+                        state,
+                        &d,
+                        bjerrum_length,
+                    ),
+                ),
+            });
             v.push((
                 "Born",
                 Born.helmholtz_energy_density(
@@ -1246,12 +1279,14 @@ mod tests_electrolyte {
     use crate::epcpsaft::parameters::utils::{water_nacl_parameters, water_nacl_records};
     use crate::epcpsaft::{EPcpSaftAssociationRecord, EPcpSaftRecord};
     use approx::assert_relative_eq;
+    #[cfg(feature = "pcsaft")]
     use feos_core::parameter::IdentifierOption;
     use feos_core::{Contributions, DensityInitialization, FeosError, State};
     use nalgebra::dvector;
     use num_dual::Dual64;
     use quantity::{BAR, COULOMB, JOULE, KB, KELVIN, MOL, QE};
 
+    #[cfg(feature = "pcsaft")]
     const COMPONENTS: [&str; 4] = ["water", "acetone", "methanol", "carbon dioxide"];
 
     /// ePCP-SAFT without ions is PCP-SAFT: all contributions, pressure and fugacity
@@ -1526,7 +1561,41 @@ mod tests_electrolyte {
     /// d(A_DH / kT) / dN_i approaches the Debye-Hückel limiting law -z_i^2 lambda_B kappa / 2.
     #[test]
     fn debye_hueckel_limiting_law() -> FeosResult<()> {
-        let eos = EPcpSaft::new(water_nacl_parameters())?;
+        for (variant, packing, name) in VARIANTS {
+            limiting_law(variant, packing, name)?;
+        }
+        Ok(())
+    }
+
+    /// all ionic terms
+    const VARIANTS: [(EPcpSaftVariants, MsaPacking, &str); 3] = [
+        (EPcpSaftVariants::DebyeHueckel, MsaPacking::Ions, "Ionic"),
+        (
+            EPcpSaftVariants::MeanSphericalApproximation,
+            MsaPacking::Ions,
+            "MSA",
+        ),
+        (
+            EPcpSaftVariants::MeanSphericalApproximation,
+            MsaPacking::Total,
+            "MSA",
+        ),
+    ];
+
+    fn with_variant(
+        epcpsaft_variant: EPcpSaftVariants,
+        msa_packing: MsaPacking,
+    ) -> FeosResult<EPcpSaft> {
+        let options = EPcpSaftOptions {
+            epcpsaft_variant,
+            msa_packing,
+            ..Default::default()
+        };
+        EPcpSaft::with_options(water_nacl_parameters(), options)
+    }
+
+    fn limiting_law(variant: EPcpSaftVariants, packing: MsaPacking, name: &str) -> FeosResult<()> {
+        let eos = with_variant(variant, packing)?;
         let t = 298.15;
         let v = 30.0;
         // deviations from the limiting law are of order kappa d (6e-4, 6e-7, 6e-10)
@@ -1538,10 +1607,7 @@ mod tests_electrolyte {
             ];
             let s = StateHD::new(Dual64::from(t), Dual64::from(v), &n);
             let contributions = eos.reduced_helmholtz_energy_density_contributions(&s);
-            let (_, ionic) = contributions
-                .iter()
-                .find(|(name, _)| *name == "Ionic")
-                .unwrap();
+            let (_, ionic) = contributions.iter().find(|(n, _)| *n == name).unwrap();
             let mu_dh = (*ionic * v).eps;
 
             let s = StateHD::new(t, v, &dvector![1.0, c, c]);
@@ -1558,7 +1624,14 @@ mod tests_electrolyte {
     /// of the permittivity in the ionic and Born terms.
     #[test]
     fn pressure_finite_difference() -> FeosResult<()> {
-        let eos = EPcpSaft::new(water_nacl_parameters())?;
+        for (variant, packing, _) in VARIANTS {
+            pressure_fd(variant, packing)?;
+        }
+        Ok(())
+    }
+
+    fn pressure_fd(variant: EPcpSaftVariants, packing: MsaPacking) -> FeosResult<()> {
+        let eos = with_variant(variant, packing)?;
         let t = 310.0;
         let v = 25.0;
         let n = dvector![0.9, 0.05, 0.05];
@@ -1577,6 +1650,77 @@ mod tests_electrolyte {
             let fd = (a_p - a_m) / (2.0 * h);
             assert_relative_eq!((*a_ad * vd).eps, fd, max_relative = 1e-7);
             println!("{name}: {} {fd}", (*a_ad * vd).eps);
+        }
+        Ok(())
+    }
+
+    /// MSA and Debye-Hückel agree in the limit of low concentrations (both -κ³/(12π)) and differ
+    /// at finite concentrations; all other contributions are identical
+    #[test]
+    fn msa_and_debye_hueckel() -> FeosResult<()> {
+        let dh = with_variant(EPcpSaftVariants::DebyeHueckel, MsaPacking::Ions)?;
+        let msa = with_variant(
+            EPcpSaftVariants::MeanSphericalApproximation,
+            MsaPacking::Ions,
+        )?;
+        for (c, close) in [(1e-9, true), (0.05, false)] {
+            let s = StateHD::new(298.15, 30.0, &dvector![1.0, c, c]);
+            let a = dh.reduced_helmholtz_energy_density_contributions(&s);
+            let b = msa.reduced_helmholtz_energy_density_contributions(&s);
+            for ((na, va), (nb, vb)) in a.iter().zip(&b) {
+                if *na == "Ionic" {
+                    assert_eq!(*nb, "MSA");
+                    let rel = (vb / va - 1.0).abs();
+                    assert!(if close { rel < 1e-3 } else { rel > 1e-2 }, "{c}: {rel}");
+                } else {
+                    assert_eq!(na, nb);
+                    assert_eq!(va, vb);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Gibbs-Duhem relation at constant T and p, sum_i x_i d ln(phi_i) = 0, for all variants:
+    /// (1) with the composition derivatives N (d ln phi_i / d N_j) of feos, (2) with central
+    /// differences of ln phi between electroneutral compositions (from 0.1 mol/kg).
+    #[test]
+    fn gibbs_duhem() -> FeosResult<()> {
+        for (variant, packing, _) in VARIANTS {
+            let eos = with_variant(variant, packing)?;
+            for t in [298.15, 373.15] {
+                for m in [0.01, 0.1, 1.0, 5.0] {
+                    let n = |m: f64| dvector![55.508, m, m] * MOL;
+                    let state = |m: f64| {
+                        State::new_npt(
+                            &&eos,
+                            t * KELVIN,
+                            5.0 * BAR,
+                            n(m),
+                            Some(DensityInitialization::Liquid),
+                        )
+                    };
+                    let s = state(m)?;
+                    let x = s.molefracs.clone();
+                    let gd = s.n_dln_phi_dnj().transpose() * &x;
+                    assert!(gd.amax() < 1e-10, "{variant:?} {packing:?} {t} {m}: {gd}");
+
+                    // step 1e-3 m: truncation error of order 1e-6 relative; the convergence tolerance
+                    // of the density iteration limits ln phi to about 1e-11, which exceeds the terms
+                    // x_i d ln(phi_i) (about 1e-8) below 0.1 mol/kg
+                    if m < 0.1 {
+                        continue;
+                    }
+                    let h = 1e-3 * m;
+                    let dln_phi = state(m + h)?.ln_phi() - state(m - h)?.ln_phi();
+                    let terms = x.component_mul(&dln_phi);
+                    let (sum, scale) = (terms.sum(), terms.abs().sum());
+                    assert!(
+                        (sum / scale).abs() < 1e-4,
+                        "{variant:?} {packing:?} {t} {m}: {sum} {scale}"
+                    );
+                }
+            }
         }
         Ok(())
     }

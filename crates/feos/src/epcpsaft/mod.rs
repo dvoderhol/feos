@@ -11,8 +11,9 @@ pub(crate) mod parameters;
 #[cfg(feature = "dft")]
 pub use dft::{EPcpSaftFunctional, EPcpSaftFunctionalContribution};
 pub use eos::{
-    DQVariants, EPcpSaft, EPcpSaftAD, EPcpSaftBinary, EPcpSaftOptions, EPcpSaftParameter,
-    EPcpSaftPure,
+    DQVariants, ELECTROLYTE_GRADIENT_CHUNK, EPcpSaft, EPcpSaftAD, EPcpSaftBinary, EPcpSaftOptions,
+    EPcpSaftParameter, EPcpSaftPure, EPcpSaftVariants, ElectrolyteDerivatives, MsaPacking,
+    ValueGradient, electrolyte_properties_derivatives,
 };
 pub use parameters::EPcpSaftPars;
 pub use parameters::{

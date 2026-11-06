@@ -42,6 +42,33 @@ Currently the following phase equilibrium properties are available in the AD int
 
 For all properties `xyz`, `Property` contains a method `Property.xyz(eos, input)` which uses a model from the [`EquationOfState`](eos.md#the-equationofstate-class) class. This evaluation can be useful for comparisons of the same data to established models. For parameter estimation or learning, the `Property.xyz_derivatives(model, parameter_names, parameters, input)` methods can be used to determine values and derivatives with respect to the model parameters indicated in `parameter_names`.
 
+## Electrolyte solutions (ePCP-SAFT)
+`Property.electrolyte_properties_derivatives(parameters, derivatives, input, solvent=0, ...)` evaluates ePCP-SAFT for
+every row of `input` (temperature in K, pressure in Pa, amounts of all components in mol; electroneutral) and returns
+dictionaries of values and derivatives with respect to the requested parameters, and the convergence status:
+
+|key|value|
+|-|-|
+|`ln_solvent_activity`|$\ln a_s$|
+|`ln_gamma`|$\ln\gamma_i$, mole-fraction scale; solutes: infinite dilution in the pure solvent, solvent: pure solvent|
+|`volume_difference`|volume of the solution minus volume of the pure solvent (m³)|
+|`residual_heat_capacity_difference`|residual isobaric heat capacity of the solution minus that of the pure solvent (J/K)|
+|`residual_enthalpy_difference`|residual enthalpy of the solution minus that of the pure solvent (J)|
+
+Parameters are given as `(name, indices)`:
+
+|name|indices|
+|-|-|
+|`m`, `sigma`, `epsilon_k`, `mu`, `q`|`[i]`|
+|`dipole_scaling`, `polarizability_scaling`, `correlation_integral_parameter`|`[i]`|
+|`k_ij`|`[i, j]`|
+|`born_delta_cation`, `born_delta_anion`|`[]`|
+
+All options of `EquationOfState.epcpsaft` can be passed, including `epcpsaft_variant` (`"dh"`: Debye-Hückel,
+`"msa"`: mean spherical approximation) and `msa_packing` (`"ions"`: packing term of the MSA over the ions only,
+`"total"`: over all species). Rows are evaluated in parallel. An example of a fit of ion parameters is given
+in `examples/epcpsaft/parameter_adjustment`.
+
 ## Examples
 The following example calculates pure-component vapor pressures including their derivatives with respect to the core PC-SAFT parameters for 10 Million temperatures in merely two seconds.
 

@@ -11,6 +11,7 @@ Fit of the permittivity model of Rueben et al. (2024a) to DDB data with the liqu
 | `iapws.py` | IAPWS-95 (CoolProp) and IAPWS R8-97 static dielectric constant of water |
 | `01_water_permittivity.ipynb` | water: fits (scheme P), validation with IAPWS R8-97 |
 | `02_solvent_permittivity.ipynb` | all substances: schemes, errors, comparison with the PC-SAFT database of Rueben et al. (2024a) |
+| [`parameter_adjustment/`](parameter_adjustment/README.md) | simultaneous fit of the ion parameters of all ions to electrolyte data |
 
 ## Licensed data
 

@@ -1,9 +1,11 @@
 //! ePCP-SAFT with model parameters as dual numbers (derivatives with respect to model parameters).
 use super::EPcpSaft;
 use crate::epcpsaft::parameters::EPcpSaftPars;
+use feos_core::ad::ElectrolyteProperties;
 use feos_core::{FeosError, FeosResult, Residual, StateHD};
 use nalgebra::{Const, DVector, Dyn, U1};
 use num_dual::{Derivative, DualNum, DualSVec};
+use quantity::{JOULE, KELVIN, METER, Moles, Pressure, Temperature};
 use std::f64::consts::FRAC_PI_6;
 use std::sync::Arc;
 
@@ -56,19 +58,28 @@ impl EPcpSaftAD<f64> {
         &self,
         parameters: [EPcpSaftParameter; P],
     ) -> FeosResult<EPcpSaftAD<DualSVec<f64, f64, P>>> {
+        self.derivatives_partial(&parameters)
+    }
+
+    /// Model with derivatives with respect to at most `P` parameters (gradient component k
+    /// corresponds to `parameters[k]`; components `parameters.len()..P` are zero).
+    pub fn derivatives_partial<const P: usize>(
+        &self,
+        parameters: &[EPcpSaftParameter],
+    ) -> FeosResult<EPcpSaftAD<DualSVec<f64, f64, P>>> {
         use EPcpSaftParameter::*;
+        if parameters.len() > P {
+            return Err(FeosError::IncompatibleParameters(format!(
+                "{} parameters, but only {P} derivative components",
+                parameters.len()
+            )));
+        }
         let p0 = &self.params;
         let n = p0.m.len();
         let mut p = p0.map(DualSVec::from);
         let error = |msg: String| Err(FeosError::IncompatibleParameters(msg));
+        check_duplicates(parameters)?;
         for (k, &parameter) in parameters.iter().enumerate() {
-            let same = |&q: &EPcpSaftParameter| match (q, parameter) {
-                (KIJ(a, b), KIJ(c, d)) => (a, b) == (c, d) || (a, b) == (d, c),
-                _ => q == parameter,
-            };
-            if parameters[..k].iter().any(same) {
-                return error(format!("{parameter:?}: requested more than once"));
-            }
             let seed = |x: &mut DualSVec<f64, f64, P>| {
                 x.eps = Derivative::derivative_generic(Const::<P>, U1, k)
             };
@@ -186,6 +197,118 @@ impl<D: DualNum<f64> + Copy> Residual<Dyn, D> for EPcpSaftAD<D> {
     }
 }
 
+/// Number of derivatives evaluated simultaneously by [electrolyte_properties_derivatives].
+pub const ELECTROLYTE_GRADIENT_CHUNK: usize = 8;
+
+/// Error if a parameter is requested more than once (k_ij and k_ji are the same parameter).
+fn check_duplicates(parameters: &[EPcpSaftParameter]) -> FeosResult<()> {
+    use EPcpSaftParameter::KIJ;
+    for (k, &parameter) in parameters.iter().enumerate() {
+        let same = |&q: &EPcpSaftParameter| match (q, parameter) {
+            (KIJ(a, b), KIJ(c, d)) => (a, b) == (c, d) || (a, b) == (d, c),
+            _ => q == parameter,
+        };
+        if parameters[..k].iter().any(same) {
+            return Err(FeosError::IncompatibleParameters(format!(
+                "{parameter:?}: requested more than once"
+            )));
+        }
+    }
+    Ok(())
+}
+
+impl EPcpSaftAD<f64> {
+    /// Error if the derivatives with respect to `parameters` cannot be calculated (unknown
+    /// component, fixed parameter, duplicates; any number of parameters).
+    pub fn check_derivatives(&self, parameters: &[EPcpSaftParameter]) -> FeosResult<()> {
+        check_duplicates(parameters)?;
+        for chunk in parameters.chunks(ELECTROLYTE_GRADIENT_CHUNK) {
+            self.derivatives_partial::<ELECTROLYTE_GRADIENT_CHUNK>(chunk)?;
+        }
+        Ok(())
+    }
+}
+
+/// A value and its derivatives with respect to model parameters.
+#[derive(Clone, Debug)]
+pub struct ValueGradient {
+    pub value: f64,
+    pub gradient: DVector<f64>,
+}
+
+/// [feos_core::ad::ElectrolyteProperties] (SI units: m³, J/K, J) and their derivatives with
+/// respect to model parameters.
+#[derive(Clone, Debug)]
+pub struct ElectrolyteDerivatives {
+    pub ln_solvent_activity: ValueGradient,
+    pub ln_gamma: Vec<ValueGradient>,
+    pub volume_difference: ValueGradient,
+    pub residual_heat_capacity_difference: ValueGradient,
+    pub residual_enthalpy_difference: ValueGradient,
+}
+
+/// Electrolyte properties ([feos_core::ad::ElectrolyteProperties]) at `temperature`, `pressure`
+/// and amounts `moles` with the solvent `solvent`, and their derivatives with respect to
+/// `parameters` (any number; evaluated in chunks of [ELECTROLYTE_GRADIENT_CHUNK]).
+pub fn electrolyte_properties_derivatives(
+    model: &Arc<EPcpSaft>,
+    parameters: &[EPcpSaftParameter],
+    temperature: Temperature,
+    pressure: Pressure,
+    moles: &Moles<DVector<f64>>,
+    solvent: usize,
+) -> FeosResult<ElectrolyteDerivatives> {
+    const P: usize = ELECTROLYTE_GRADIENT_CHUNK;
+    check_duplicates(parameters)?;
+    let n = moles.len();
+    let np = parameters.len();
+    let new = |v: f64| ValueGradient {
+        value: v,
+        gradient: DVector::zeros(np),
+    };
+    let ad = EPcpSaftAD::new(model.clone());
+    let mut out: Option<ElectrolyteDerivatives> = None;
+    let chunks: Vec<_> = if parameters.is_empty() {
+        vec![&parameters[..0]]
+    } else {
+        parameters.chunks(P).collect()
+    };
+    let mut offset = 0;
+    for chunk in chunks {
+        let eos = ad.derivatives_partial::<P>(chunk)?;
+        let e = ElectrolyteProperties::new(&eos, temperature, pressure, moles, solvent)?;
+        let values = [
+            e.ln_solvent_activity,
+            e.volume_difference.convert_into(METER * METER * METER),
+            e.residual_heat_capacity_difference
+                .convert_into(JOULE / KELVIN),
+            e.residual_enthalpy_difference.convert_into(JOULE),
+        ];
+        let o = out.get_or_insert_with(|| ElectrolyteDerivatives {
+            ln_solvent_activity: new(values[0].re),
+            ln_gamma: e.ln_gamma.iter().map(|x| new(x.re)).collect(),
+            volume_difference: new(values[1].re),
+            residual_heat_capacity_difference: new(values[2].re),
+            residual_enthalpy_difference: new(values[3].re),
+        });
+        let set = |target: &mut ValueGradient, x: &DualSVec<f64, f64, P>| {
+            let eps = x.eps.unwrap_generic(Const::<P>, U1);
+            for k in 0..chunk.len() {
+                target.gradient[offset + k] = eps[k];
+            }
+        };
+        set(&mut o.ln_solvent_activity, &values[0]);
+        set(&mut o.volume_difference, &values[1]);
+        set(&mut o.residual_heat_capacity_difference, &values[2]);
+        set(&mut o.residual_enthalpy_difference, &values[3]);
+        for i in 0..n {
+            set(&mut o.ln_gamma[i], &e.ln_gamma[i]);
+        }
+        offset += chunk.len();
+    }
+    Ok(out.unwrap())
+}
+
 #[cfg(test)]
 mod tests {
     use super::EPcpSaftParameter::*;
@@ -197,7 +320,7 @@ mod tests {
     use feos_core::{DensityInitialization, ReferenceSystem, ResidualDyn, State};
     use nalgebra::dvector;
     use num_dual::DualStruct;
-    use quantity::{BAR, KELVIN, Pressure, Temperature};
+    use quantity::{BAR, JOULE, KELVIN, METER, MOL, PASCAL, Pressure, Temperature};
 
     /// water, Na+, Cl- with k_ij(water, Na+) = 0.01, k_ij(Na+, Cl-) = 0.02
     fn water_nacl() -> FeosResult<EPcpSaft> {
@@ -215,6 +338,167 @@ mod tests {
             Some("../../parameters/epcpsaft/rehner2023_binary.json"),
             IdentifierOption::Name,
         )?)
+    }
+
+    /// model with one adjustable parameter changed by `h`
+    fn perturbed(eos: &Arc<EPcpSaft>, parameter: EPcpSaftParameter, h: f64) -> EPcpSaftAD<f64> {
+        let mut ad = EPcpSaftAD::new(eos.clone());
+        let p = &mut ad.params;
+        match parameter {
+            M(i) => p.m[i] += h,
+            Sigma(i) => p.sigma[i] += h,
+            EpsilonK(i) => p.epsilon_k[i] += h,
+            Mu(i) => p.mu[i] += h,
+            Q(i) => p.q[i] += h,
+            KIJ(i, j) => {
+                p.k_ij[(i, j)] += h;
+                p.k_ij[(j, i)] += h
+            }
+            DipoleScaling(i) => p.permittivity.as_mut().unwrap()[0][i] += h,
+            PolarizabilityScaling(i) => p.permittivity.as_mut().unwrap()[1][i] += h,
+            CorrelationIntegralParameter(i) => p.permittivity.as_mut().unwrap()[2][i] += h,
+            BornDeltaCation => p.born_delta[0] += h,
+            BornDeltaAnion => p.born_delta[1] += h,
+        }
+        ad.params = ad.params.map(|x| x);
+        ad
+    }
+
+    /// Electrolyte properties (water + NaCl, 1.5 mol/kg) and their derivatives with respect to
+    /// 10 parameters (two chunks) agree with central differences (Debye-Hückel and MSA).
+    #[test]
+    fn electrolyte_properties_gradient() -> FeosResult<()> {
+        use super::super::EPcpSaftVariants::*;
+        use super::super::MsaPacking::*;
+        for (epcpsaft_variant, msa_packing) in [
+            (DebyeHueckel, Ions),
+            (MeanSphericalApproximation, Ions),
+            (MeanSphericalApproximation, Total),
+        ] {
+            electrolyte_properties_gradient_variant(epcpsaft_variant, msa_packing)?;
+        }
+        Ok(())
+    }
+
+    fn electrolyte_properties_gradient_variant(
+        epcpsaft_variant: super::super::EPcpSaftVariants,
+        msa_packing: super::super::MsaPacking,
+    ) -> FeosResult<()> {
+        let options = super::super::EPcpSaftOptions {
+            born_delta_cation: 0.1,
+            born_delta_anion: -0.05,
+            epcpsaft_variant,
+            msa_packing,
+            ..Default::default()
+        };
+        let binary = vec![
+            BinaryRecord::new(0, 1, Some(EPcpSaftBinaryRecord::new(0.01))),
+            BinaryRecord::new(0, 2, Some(EPcpSaftBinaryRecord::new(-0.02))),
+        ];
+        let eos = Arc::new(EPcpSaft::with_options(
+            EPcpSaftParameters::new(water_nacl_records(), binary)?,
+            options,
+        )?);
+        let moles = dvector![1.0 / 0.018015268, 1.5, 1.5] * MOL;
+        let (t, p) = (320.0 * KELVIN, 2e5 * PASCAL);
+        let parameters = [
+            Sigma(1),
+            EpsilonK(2),
+            KIJ(0, 1),
+            KIJ(0, 2),
+            DipoleScaling(1),
+            CorrelationIntegralParameter(2),
+            BornDeltaCation,
+            BornDeltaAnion,
+            Sigma(2),
+            EpsilonK(1),
+        ];
+        let flatten = |e: &ElectrolyteDerivatives| {
+            let mut v = vec![
+                e.ln_solvent_activity.clone(),
+                e.volume_difference.clone(),
+                e.residual_heat_capacity_difference.clone(),
+                e.residual_enthalpy_difference.clone(),
+            ];
+            v.extend(e.ln_gamma.iter().cloned());
+            v
+        };
+        let d = flatten(&electrolyte_properties_derivatives(
+            &eos,
+            &parameters,
+            t,
+            p,
+            &moles,
+            0,
+        )?);
+        let values: Vec<f64> = d.iter().map(|x| x.value).collect();
+        let f64_values = |ad: &EPcpSaftAD<f64>| -> FeosResult<Vec<f64>> {
+            let e = ElectrolyteProperties::<f64>::new(ad, t, p, &moles, 0)?;
+            let mut v = vec![
+                e.ln_solvent_activity,
+                e.volume_difference.convert_into(METER * METER * METER),
+                e.residual_heat_capacity_difference
+                    .convert_into(JOULE / KELVIN),
+                e.residual_enthalpy_difference.convert_into(JOULE),
+            ];
+            v.extend(e.ln_gamma.iter());
+            Ok(v)
+        };
+        let v0 = f64_values(&EPcpSaftAD::new(eos.clone()))?;
+        // the density iteration converges to its tolerance with dual and real numbers alike
+        for (a, b) in values.iter().zip(&v0) {
+            assert_relative_eq!(a, b, max_relative = 1e-8);
+        }
+        // 4th-order central differences with a step large compared to the convergence
+        // tolerance of the density iteration
+        let scale = |parameter| match parameter {
+            Sigma(_) => 3.0,
+            EpsilonK(_) => 200.0,
+            DipoleScaling(_) => 5.0,
+            BornDeltaCation | BornDeltaAnion => 10.0,
+            _ => 1.0,
+        };
+        for (k, &parameter) in parameters.iter().enumerate() {
+            let h = 1e-3 * scale(parameter);
+            let v = |h| f64_values(&perturbed(&eos, parameter, h));
+            let (v1, v2, v3, v4) = (v(h)?, v(-h)?, v(2.0 * h)?, v(-2.0 * h)?);
+            for i in 0..values.len() {
+                let fd = (8.0 * (v1[i] - v2[i]) - (v3[i] - v4[i])) / (12.0 * h);
+                println!("{parameter:?} {i}: {} {fd}", d[i].gradient[k]);
+                assert_relative_eq!(
+                    d[i].gradient[k],
+                    fd,
+                    max_relative = 1e-5,
+                    epsilon = 1e-9 * (1.0 + values[i].abs())
+                );
+            }
+        }
+        // osmotic coefficient of the solution: physical range
+        let phi = -values[0] / (0.018015268 * 3.0);
+        assert!(phi > 0.3 && phi < 2.0, "phi = {phi}");
+        Ok(())
+    }
+
+    /// the whole parameter list is checked (duplicates in different chunks, fixed parameters)
+    #[test]
+    fn check_derivatives() -> FeosResult<()> {
+        let ad = EPcpSaftAD::new(Arc::new(water_nacl()?));
+        let mut long = vec![Sigma(1); 1];
+        long.extend([
+            Sigma(2),
+            EpsilonK(1),
+            EpsilonK(2),
+            KIJ(0, 1),
+            KIJ(0, 2),
+            M(0),
+            Sigma(0),
+        ]);
+        assert!(ad.check_derivatives(&long).is_ok());
+        long.push(Sigma(1)); // duplicate in the second chunk
+        assert!(ad.check_derivatives(&long).is_err());
+        assert!(ad.check_derivatives(&[KIJ(1, 1)]).is_err());
+        assert!(ad.check_derivatives(&[Mu(1)]).is_err());
+        Ok(())
     }
 
     /// central difference of a / (kT) with respect to one adjustable parameter

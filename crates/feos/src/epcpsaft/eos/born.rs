@@ -4,6 +4,9 @@ use nalgebra::DVector;
 use num_dual::DualNum;
 
 /// Born contribution (Bülow et al. 2021, Rueben et al. 2024).
+///
+/// The Born diameter of an ion is its hard-sphere diameter (0.88 σ_i, as in Held et al. 2014,
+/// eq. 21) plus `born_delta_cation` or `born_delta_anion`; Bülow et al. (2021) use σ_i.
 pub struct Born;
 
 impl Born {

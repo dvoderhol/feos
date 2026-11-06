@@ -17,6 +17,11 @@ def psat(T):
     return PropsSI("P", "T", T, "Q", 0, "Water")
 
 
+def saturation_temperature(p):
+    """saturation temperature of pure water at p [K]"""
+    return PropsSI("T", "P", p, "Q", 0, "Water")
+
+
 def rho_w(T, p):
     """liquid water density [kg/m3] (IAPWS-95; phase forced to liquid so that slightly supercooled states work)"""
     _AS.specify_phase(CoolProp.iphase_liquid)

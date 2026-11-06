@@ -13,6 +13,8 @@ use paste::paste;
 use pyo3::prelude::*;
 
 pub mod dataset;
+#[cfg(feature = "epcpsaft")]
+mod electrolyte;
 pub use dataset::{PyBinaryDataset, PyPureDataset};
 
 #[pyclass(name = "EquationOfStateAD", eq, eq_int, from_py_object)]
