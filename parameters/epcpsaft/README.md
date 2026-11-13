@@ -1,6 +1,6 @@
 # ePCP-SAFT Parameters
 
-This directory contains files with parameters for the ePCP-SAFT equation of state: PCP-SAFT with the Debye-Hückel and Born contributions of ePC-SAFT and the permittivity model of [Rueben et al. (2024b)](https://doi.org/10.1021/acs.jced.4c00347).
+This directory contains files with parameters for the ePCP-SAFT equation of state: PCP-SAFT with the ion-ion contributions (Debye-Hückel, mean spherical approximation, and both with ion pairing: BiDH, BiMSA), the Born contribution and the permittivity model of [Rueben et al. (2024b)](https://doi.org/10.1021/acs.jced.4c00347).
 The publications are provided in the [`literature.bib`](literature.bib) file.
 
 All PCP-SAFT parameters are identical to the files in [`../pcsaft`](../pcsaft). Only parameters that do not exist in PCP-SAFT are added.
@@ -20,9 +20,8 @@ All PCP-SAFT parameters are identical to the files in [`../pcsaft`](../pcsaft). 
 ## Permittivity Parameters
 
 `permittivity_record` with `PerturbationTheory` parameters ([Rueben et al. 2022](https://doi.org/10.1016/j.fluid.2021.113346), [Rueben et al. 2024a](https://doi.org/10.1021/acs.jced.3c00323)) for 753 substances,
-fitted with the liquid density of the PCP-SAFT parameters of the respective substance by
-[`examples/epcpsaft/fit_solvent_permittivity.py`](../../examples/epcpsaft/fit_solvent_permittivity.py):
-DDB data (filter of Rueben et al. 2024a without the pressure limit; experimental data only, duplicates and identical values removed), Huber loss,
+fitted with the liquid density of the PCP-SAFT parameters of the respective substance (the fitting scripts are not part
+of this repository): DDB data (filter of Rueben et al. 2024a without the pressure limit; experimental data only, duplicates and identical values removed), Huber loss,
 scheme selection of Rueben et al. (2024a); water: scheme P prescribed (`dipole_scaling` 5.2607 D², `correlation_integral_parameter` 0.1320).
 
 ## Ions

@@ -272,6 +272,6 @@ macro_rules! impl_3d_profile {
     };
 }
 
+pub(crate) use {impl_1d_profile, impl_2d_profile, impl_profile};
 #[cfg(feature = "rayon")]
 pub(crate) use impl_3d_profile;
-pub(crate) use {impl_1d_profile, impl_2d_profile, impl_profile};
