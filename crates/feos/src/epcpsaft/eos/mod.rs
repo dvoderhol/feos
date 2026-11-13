@@ -13,11 +13,14 @@ use std::f64::consts::{FRAC_PI_6, PI};
 
 mod ad;
 mod association;
+mod bidh;
+mod bimsa;
 mod born;
 pub(crate) mod dispersion;
 mod epcpsaft_binary;
 mod epcpsaft_pure;
 pub(crate) mod hard_chain;
+mod ion_pairing;
 mod ionic;
 mod msa;
 pub(crate) mod permittivity;
@@ -46,6 +49,10 @@ pub enum EPcpSaftVariants {
     DebyeHueckel,
     /// Mean spherical approximation of the primitive model (Blum 1975).
     MeanSphericalApproximation,
+    /// Debye-Hückel term with ion pairing (BiDH; Naseri Boroujeni et al. 2023), see [bidh].
+    BiDH,
+    /// Binding mean spherical approximation (BiMSA; Blum and Bernard 1995), variational form, see [bimsa].
+    BiMSA,
 }
 
 /// Customization options for the ePCP-SAFT equation of state and functional.
@@ -198,6 +205,24 @@ impl EPcpSaft {
                         bjerrum_length,
                     ),
                 ),
+                EPcpSaftVariants::BiDH => {
+                    let (rho, z, di, g, f) = ion_pair_input(p, state, &d);
+                    ("BiDH", bidh::bidh(&rho, &z, &di, &g, &f, bjerrum_length).0)
+                }
+                EPcpSaftVariants::BiMSA => {
+                    let (rho, z, di, g, f) = ion_pair_input(p, state, &d);
+                    let delta = msa::packing_term(self.options.msa_packing, p, state, &d);
+                    let input = bimsa::BiMsaInput {
+                        rho: &rho,
+                        z: &z,
+                        d: &di,
+                        delta,
+                        lb: bjerrum_length,
+                        g: &g,
+                        f: &f,
+                    };
+                    ("BiMSA", bimsa::bimsa(&input).0)
+                }
             });
             v.push((
                 "Born",
@@ -523,6 +548,36 @@ impl EntropyScaling for EPcpSaft {
         let d = coefficients.row(3).transpose().dot(&pref);
         a + b * s + c * (1.0 - s.exp()) + d * s.powi(2)
     }
+}
+
+/// Densities, charges and diameters of the ions, contact values of the hard-sphere mixture of all species at
+/// (d_i + d_j)/2 (expression of the association term) and logarithms of the pairing factors, for the ion-pairing
+/// variants.
+#[expect(clippy::type_complexity)]
+fn ion_pair_input<D: DualNum<f64> + Copy>(
+    p: &EPcpSaftPars<D>,
+    state: &StateHD<D>,
+    d: &DVector<D>,
+) -> (
+    Vec<D>,
+    Vec<f64>,
+    Vec<D>,
+    nalgebra::DMatrix<D>,
+    nalgebra::DMatrix<D>,
+) {
+    let ions = &p.ionic_comp;
+    let rho: Vec<D> = ions.iter().map(|&i| state.partial_density[i]).collect();
+    let z: Vec<f64> = ions.iter().map(|&i| p.z[i]).collect();
+    let di: Vec<D> = ions.iter().map(|&i| d[i]).collect();
+    let [zeta2, zeta3] = p.packing(state.temperature, &state.partial_density, [2, 3]);
+    let n3i = (-zeta3 + 1.0).recip();
+    let n = ions.len();
+    let g = nalgebra::DMatrix::from_fn(n, n, |a, b| {
+        let k = di[a] * di[b] / (di[a] + di[b]) * (zeta2 * 6.0 * n3i);
+        n3i * (k * (k / 18.0 + 0.5) + 1.0)
+    });
+    let f = nalgebra::DMatrix::from_fn(n, n, |a, b| p.ion_pairing[(ions[a], ions[b])]);
+    (rho, z, di, g, f)
 }
 
 #[cfg(test)]
@@ -1568,7 +1623,7 @@ mod tests_electrolyte {
     }
 
     /// all ionic terms
-    const VARIANTS: [(EPcpSaftVariants, MsaPacking, &str); 3] = [
+    const VARIANTS: [(EPcpSaftVariants, MsaPacking, &str); 5] = [
         (EPcpSaftVariants::DebyeHueckel, MsaPacking::Ions, "Ionic"),
         (
             EPcpSaftVariants::MeanSphericalApproximation,
@@ -1580,6 +1635,8 @@ mod tests_electrolyte {
             MsaPacking::Total,
             "MSA",
         ),
+        (EPcpSaftVariants::BiDH, MsaPacking::Ions, "BiDH"),
+        (EPcpSaftVariants::BiMSA, MsaPacking::Ions, "BiMSA"),
     ];
 
     fn with_variant(
@@ -1598,8 +1655,17 @@ mod tests_electrolyte {
         let eos = with_variant(variant, packing)?;
         let t = 298.15;
         let v = 30.0;
-        // deviations from the limiting law are of order kappa d (6e-4, 6e-7, 6e-10)
-        for (c, tol) in [(1e-8, 1e-3), (1e-14, 1e-6), (1e-20, 1e-9)] {
+        // deviations from the limiting law are of order kappa d (6e-4, 6e-7, 6e-10); with ion pairing additionally
+        // of order rho K g / (lambda_B kappa) (about 1e-3, 1e-6, 1e-9: pairing is of first order in the density)
+        let factor = match variant {
+            EPcpSaftVariants::BiDH | EPcpSaftVariants::BiMSA => 5.0,
+            _ => 1.0,
+        };
+        for (c, tol) in [
+            (1e-8, 1e-3 * factor),
+            (1e-14, 1e-6 * factor),
+            (1e-20, 1e-9 * factor),
+        ] {
             let n = dvector![
                 Dual64::from(1.0),
                 Dual64::from(c).derivative(),

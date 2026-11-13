@@ -18,8 +18,10 @@ fn epcpsaft_variant(epcpsaft_variant: &str) -> PyResult<EPcpSaftVariants> {
     match epcpsaft_variant {
         "dh" => Ok(EPcpSaftVariants::DebyeHueckel),
         "msa" => Ok(EPcpSaftVariants::MeanSphericalApproximation),
+        "bidh" => Ok(EPcpSaftVariants::BiDH),
+        "bimsa" => Ok(EPcpSaftVariants::BiMSA),
         _ => Err(PyErr::new::<PyValueError, _>(
-            r#"epcpsaft_variant must be "dh" or "msa""#,
+            r#"epcpsaft_variant must be "dh", "msa", "bidh" or "bimsa""#,
         )),
     }
 }
@@ -84,12 +86,15 @@ impl PyEquationOfState {
     ///     Tolerance for convergence of cross association. Defaults to 1e-10.
     /// dq_variant : "dq35" | "dq44", optional
     ///     Combination rule used in the dipole/quadrupole term. Defaults to "dq35"
-    /// epcpsaft_variant : "dh" | "msa", optional
-    ///     Term for the electrostatic interactions between ions: Debye-Hückel ("dh") or mean
-    ///     spherical approximation of the primitive model ("msa"). Defaults to "dh".
+    /// epcpsaft_variant : "dh" | "msa" | "bidh" | "bimsa", optional
+    ///     Term for the electrostatic interactions between ions: Debye-Hückel ("dh"), mean
+    ///     spherical approximation of the primitive model ("msa"), Debye-Hückel with ion pairing
+    ///     ("bidh") or binding mean spherical approximation ("bimsa"). The ion pairing of a cation
+    ///     and an anion uses the Bjerrum association constant times exp(`ion_pairing`) of the
+    ///     binary record. Defaults to "dh".
     /// msa_packing : "ions" | "total", optional
-    ///     Species in the packing term of the MSA: ions only (primitive model) or all species
-    ///     (excluded volume of the solvent included). Defaults to "ions".
+    ///     Species in the packing term of the MSA and BiMSA: ions only (primitive model) or all
+    ///     species (excluded volume of the solvent included). Defaults to "ions".
     /// born_delta_cation : float, optional
     ///     Correction added to the diameter of all cations in the Born term (in Angstrom). Defaults to 0.
     /// born_delta_anion : float, optional

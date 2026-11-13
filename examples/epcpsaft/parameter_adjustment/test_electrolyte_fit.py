@@ -12,6 +12,7 @@ import tempfile
 
 import feos
 import numpy as np
+import pandas as pd
 import pytest
 
 import electrolyte_data as ed
@@ -39,7 +40,7 @@ def setup(systems=None, value_column="value_true", data="data_epcpsaft", variant
                               cp, fixed=fixed)
     if reference:
         par = ef.reference_gauge(par, points, fixed)
-    return par, ef.Objective(ef.Model(par, points, variant, msa_packing))
+    return par, ef.Objective(ef.Model(par, points, variant, msa_packing, cp_model="offset"))
 
 
 def test_huber():
@@ -226,6 +227,130 @@ def test_permittivity_variant():
         ef.permittivity_variant(par, "PT3")
 
 
+def test_ideal_gas_cp():
+    """ideal-gas heat capacities of ions: 5/2 R for monatomic ions; polyatomic ions between the rigid-rotor value
+    (5/2 R + 3/2 R, or + R if linear) and the classical limit with all vibrations (one R per mode)"""
+    R = ef.R
+    assert ef.ideal_gas_cp("sodium ion", 298.15) == pytest.approx(2.5 * R, rel=1e-15)
+    for ion, (linear, modes) in ef.POLYATOMIC_IONS.items():
+        rigid = R * (2.5 + (1.0 if linear else 1.5))
+        n_modes = sum(g for _, g in modes)
+        assert rigid < ef.ideal_gas_cp(ion, 298.15) < ef.ideal_gas_cp(ion, 600.0) < rigid + n_modes * R
+        assert ef.ideal_gas_cp(ion, 1e5) == pytest.approx(rigid + n_modes * R, rel=1e-3)
+    with pytest.raises(ValueError):
+        ef.ideal_gas_cp("unknown ion", 298.15)
+    # electronic contribution: zero for single-level and closed-shell ions, two-level system for Cu2+
+    assert ef.electronic_cp("sodium ion", 298.15) == 0.0 and ef.electronic_cp("manganese ion", 298.15) == 0.0
+    x = ef.C2_CM_K * 2071.69 / 298.15
+    two_level = R * (4 / 6) * x ** 2 * np.exp(-x) / (1 + (4 / 6) * np.exp(-x)) ** 2
+    assert ef.electronic_cp("copper ion", 298.15) == pytest.approx(two_level, rel=1e-12)
+    assert ef.ideal_gas_cp("cobalt ion", 298.15, electronic=True) - ef.ideal_gas_cp("cobalt ion", 298.15) == \
+        pytest.approx(ef.electronic_cp("cobalt ion", 298.15), rel=1e-15)
+
+
+@needs_data
+def test_cp_models_and_bounds():
+    """cp_model "ideal_gas" adds sum_i m_i c_p,i^ig / m_salt to the residual value of "residual"; the optimizer bounds
+    are only the physical ones (sigma, eps_k, cross-energy variables >= 0, k_w <= 1)"""
+    par, obj = setup(["NaCl", "Na2SO4"])
+    pts = [p for p in obj.model.points if p.target == "Cp_phi"][:20]
+    v_res, _ = ef.Model(par, pts, cp_model="residual").evaluate(par.x0, jacobian=False)
+    v_ig, _ = ef.Model(par, pts, cp_model="ideal_gas").evaluate(par.x0, jacobian=False)
+    expected = [sum(m * ef.ideal_gas_cp(i, p.T) for i, m in ed.ions_of(p.composition).items())
+                / sum(p.composition.values()) for p in pts]
+    assert np.allclose(v_ig - v_res, expected, rtol=1e-12)
+    with pytest.raises(ValueError):
+        ef.Model(par, pts, cp_model="other")
+    lo, hi = par.bounds()
+    labels = par.labels()
+    for l, a, b in zip(labels, lo, hi):
+        kind = l.split("[")[0]
+        assert (a, b) == {"sigma": (0.0, np.inf), "epsilon_k": (0.0, np.inf), "k_w": (-np.inf, 1.0)}.get(
+            kind, (-np.inf, np.inf))
+    plo, phi_ = ef.Problem(obj, par, cross_energies=True).bounds()
+    ions = [i for i, l in enumerate(labels) if l.split("[")[0] in ("epsilon_k", "k_w")]
+    assert np.all(plo[ions] == 0.0) and np.all(np.isinf(phi_[ions]))
+
+
+def test_data_module_salts_split_electrolyte():
+    """salts from _salts.json, filter by split, mean ionic activity coefficient of the named electrolyte"""
+    with tempfile.TemporaryDirectory() as tmp:
+        json.dump({"XCl": {"sodium ion": 1, "chloride ion": 1}}, open(os.path.join(tmp, "_salts.json"), "w"))
+        rows = [dict(dataset_id="a", system="NaCl+XCl", property="mean_ionic_activity_coefficient", T_K=298.15,
+                     p_Pa=1e5, salt_1="NaCl", m_1=0.5, salt_2="XCl", m_2=0.5, m_1_final=np.nan, m_2_final=np.nan,
+                     value=0.7, electrolyte="XCl", split="train"),
+                dict(dataset_id="b", system="NaCl", property="osmotic_coefficient", T_K=298.15, p_Pa=1e5,
+                     salt_1="NaCl", m_1=1.0, salt_2=np.nan, m_2=np.nan, m_1_final=np.nan, m_2_final=np.nan,
+                     value=0.93, electrolyte="", split="validation")]
+        pd.DataFrame(rows).to_csv(os.path.join(tmp, "data.csv"), index=False)
+        df = ed.read(tmp)
+        assert ed.SALTS["XCl"] == {"sodium ion": 1, "chloride ion": 1}
+        pts, _ = ed.reduce(df, splits=["train"])
+        assert len(pts) == 1 and pts[0].electrolyte == "XCl" and pts[0].split == "train"
+        pts, _ = ed.reduce(df)
+        assert {p.split for p in pts} == {"train", "validation"}
+        json.dump({"XCl": {"potassium ion": 1, "chloride ion": 1}}, open(os.path.join(tmp, "_salts.json"), "w"))
+        with pytest.raises(ValueError):
+            ed.read(tmp)
+        del ed.SALTS["XCl"]
+
+
+def _sulfuric_acid(ln_k0=None, n_points=40, m_max=6.0):
+    """dummy H2SO4 data up to m_max (fully dissociated truth) with an HSO4- record (sulfate values, charge -1, for
+    tests) and the bisulfate equilibrium (ln K0 of Knopf et al. 2003 or `ln_k0`)"""
+    df = ed.read(os.path.join(ROOT, "data_epcpsaft"))
+    df = df[(df.system == "H2SO4") & (df.m_1 <= m_max)]
+    points, _ = ed.reduce(df, value_column="value_true")
+    rng = np.random.default_rng(1)
+    points = [points[k] for k in sorted(rng.choice(len(points), n_points, replace=False))]
+    params = os.path.join(ROOT, "params_epcpsaft")
+    pure, k_w = ef.read_records(os.path.join(params, "truth_pure.json"), os.path.join(params, "truth_binary.json"))
+    hso4 = dict(pure["sulfate"], identifier={"name": "hydrogen-sulfate"}, z=-1, molarweight=97.0705)
+    pure["hydrogen-sulfate"] = hso4
+    reactions = [dict(ef.REACTIONS[0], **({} if ln_k0 is None else {"ln_k0": ln_k0}))]
+    ions = ef.model_ions(points, reactions)
+    par = ef.ParameterSet.new(ions, pure, k_w, ef.water_record())
+    return par, points, reactions
+
+
+@needs_data
+def test_reactions():
+    """bisulfate equilibrium: (1) species, basis amounts and feos input; (2) with ln K = 15 (dissociation practically
+    complete; up to 2 mol/kg, at higher molalities the activity coefficients of the dummy model are large enough that
+    HSO4- forms also with ln K = 15) all targets equal those without reaction (heat capacity: central difference in T);
+    (3) up to 6 mol/kg with the
+    equilibrium constant of Knopf et al. (2003) the Jacobian agrees with central differences"""
+    par, points, reactions = _sulfuric_acid(ln_k0=15.0, n_points=120, m_max=2.0)
+    assert ef.system_species(("hydronium", "sulfate"), reactions) == ("hydrogen-sulfate", "hydronium", "sulfate")
+    assert ef.system_species(("chloride ion", "hydronium"), reactions) == ("chloride ion", "hydronium")
+    sp = ("hydrogen-sulfate", "hydronium", "sodium ion", "sulfate")
+    assert ef.basis_moles(sp, {"NaHSO4": 1.0}, reactions)[1:] == [0.0, 1.0, 1.0, 1.0] if "NaHSO4" in ed.SALTS else True
+    assert ef.feos_reactions(("hydrogen-sulfate", "hydronium", "sulfate"), reactions)[0][0] == [0.0, -1.0, 1.0, 1.0]
+    a, _ = ef.Model(par, points, cp_model="residual").evaluate(par.x0, jacobian=False)
+    b, _ = ef.Model(par, points, cp_model="residual", reactions=reactions).evaluate(par.x0, jacobian=False)
+    cp = np.array([p.target == "Cp_phi" for p in points])
+    assert np.all(np.isfinite(a)) and np.all(np.isfinite(b))
+    assert np.allclose(b[~cp], a[~cp], rtol=1e-5, atol=1e-9)
+    assert np.allclose(b[cp], a[cp], rtol=1e-3, atol=1e-2)
+
+    par, points, reactions = _sulfuric_acid()
+    model = ef.Model(par, points, cp_model="residual", reactions=reactions)
+    v, jac = model.evaluate(par.x0, jacobian=True)
+    assert np.all(np.isfinite(v))
+    for ion, name in [("hydrogen-sulfate", "sigma"), ("hydrogen-sulfate", "epsilon_k"), ("hydrogen-sulfate", "k_w"),
+                      ("hydrogen-sulfate", "dipole_scaling"), ("sulfate", "sigma")]:
+        k = par.index("ion", ion, name)
+        f = lambda dx: model.evaluate(par.x0 + dx * np.eye(len(par.x0))[k], jacobian=False)[0]
+        tol = np.where([p.target == "Cp_phi" for p in points], 1e-3, 2e-4)
+        # differences are limited by truncation (large steps, high temperatures) and by the noise of ln a_w (small
+        # steps, osmotic coefficients at low molality): a row agrees if one of the steps agrees
+        ok = np.zeros(len(points), bool)
+        for h in (1e-2 * ef.TYPICAL[name], 3e-2 * ef.TYPICAL[name]):
+            fd = (8 * (f(h) - f(-h)) - (f(2 * h) - f(-2 * h))) / (12 * h)
+            ok |= np.abs(jac[:, k] - fd) <= tol * np.abs(fd) + 1e-7 * (1 + np.abs(v))
+        assert np.all(ok), (ion, name, [points[i].target for i in np.flatnonzero(~ok)])
+
+
 @needs_data
 def test_gauge_groups():
     """one reference ion per group of ions connected through the data; with it the Jacobian has no null space"""
@@ -284,7 +409,7 @@ def test_multistart_continuation_classify():
     par, obj = setup(["NaCl"])
     problem = ef.Problem(obj, par)
     easy, _ = ed.reduce(df[(df.m_1 <= 1.0) & (df.T_K.fillna(298.15) <= 323.15)], value_column="value_true")
-    stage = ef.Problem(ef.Objective(ef.Model(par, easy)), par)
+    stage = ef.Problem(ef.Objective(ef.Model(par, easy, cp_model="offset")), par)
     y_truth = problem.to_y(par.x0[par.free])
     starts = [y_truth * (1 + 0.02 * k) for k in (1, -1, 2)]
     results = ef.continuation([stage, problem], n_starts=2, starts=starts, n_polish=3, screening_nfev=5)
@@ -292,8 +417,14 @@ def test_multistart_continuation_classify():
     assert np.all(np.diff(costs) >= 0) and np.isfinite(costs[0]) and n_best >= 1
     kind, details = ef.classify(results, par)
     assert kind in ("unimodal", "flat", "multimodal")
-    fake = [{"polished": True, "cost": c, "x": np.zeros(par.free.sum())} for c in (1.0, 1.0, 2.0)]
-    assert ef.classify(fake, par)[0] == "multimodal"
+    n = par.free.sum()
+    fake = lambda costs, shifts: [{"polished": True, "cost": c, "x": np.full(n, s)} for c, s in zip(costs, shifts)]
+    big = 10 * max(ef.TYPICAL.values())
+    assert ef.classify(fake((1.0, 1.0, 2.0), (0, 0, big)), par)[0] == "multimodal"
+    assert ef.classify(fake((1.0, 1.005, 1.0), (0, big, 0)), par)[0] == "flat"     # within 1 %: flat valley
+    assert ef.classify(fake((1.0, 1.0, 2.0), (0, 0, 0)), par)[0] == "unimodal"
+    kind, _ = ef.classify(results, par, problem=problem)                           # with tight re-polish
+    assert kind in ("unimodal", "flat", "multimodal")
 
 
 @needs_data
@@ -331,5 +462,5 @@ def test_write_parameters():
             par2.x0[par2.index("Cp_offset", block, "Cp_offset")] = value
         assert np.allclose(par2.x0, par.x0)
         a, _ = obj.model.evaluate(par.x0, jacobian=False)
-        b, _ = ef.Model(par2, obj.model.points).evaluate(par2.x0, jacobian=False)
+        b, _ = ef.Model(par2, obj.model.points, cp_model="offset").evaluate(par2.x0, jacobian=False)
         assert np.allclose(a, b, rtol=1e-12)

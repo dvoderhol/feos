@@ -59,21 +59,7 @@ impl Msa {
         if sum_rho_z2.re() == 0.0 {
             return D::zero();
         }
-        let delta = match self.0 {
-            MsaPacking::Ions => {
-                -rho.iter()
-                    .zip(&d)
-                    .fold(D::zero(), |acc, (&r, &d)| acc + r * d.powi(3))
-                    * FRAC_PI_6
-                    + 1.0
-            }
-            MsaPacking::Total => {
-                -(0..p.m.len()).fold(D::zero(), |acc, i| {
-                    acc + state.partial_density[i] * p.m[i] * diameter[i].powi(3)
-                }) * FRAC_PI_6
-                    + 1.0
-            }
-        };
+        let delta = packing_term(self.0, p, state, diameter);
 
         let gamma = screening_parameter(&rho, &z, &d, bjerrum_length, delta, sum_rho_z2);
         let eta = eta(gamma, &rho, &z, &d, delta);
@@ -85,8 +71,45 @@ impl Msa {
     }
 }
 
+/// Packing term Δ = 1 - π/6 Σ_k ρ_k d_k³ over the ions ([MsaPacking::Ions]) or over the segments of all species
+/// ([MsaPacking::Total]).
+pub(super) fn packing_term<D: DualNum<f64> + Copy>(
+    packing: MsaPacking,
+    p: &EPcpSaftPars<D>,
+    state: &StateHD<D>,
+    diameter: &DVector<D>,
+) -> D {
+    let sum = match packing {
+        MsaPacking::Ions => p.ionic_comp.iter().fold(D::zero(), |acc, &i| {
+            acc + state.partial_density[i] * diameter[i].powi(3)
+        }),
+        MsaPacking::Total => (0..p.m.len()).fold(D::zero(), |acc, i| {
+            acc + state.partial_density[i] * p.m[i] * diameter[i].powi(3)
+        }),
+    };
+    -sum * FRAC_PI_6 + 1.0
+}
+
+/// MSA functional of the screening parameter: Γ³ / (3π) - λ_B Σ_i ρ_i z_i (Γ z_i + η(Γ) d_i) / (1 + Γ d_i), stationary
+/// in Γ at the solution of the closure; `delta` is the packing term Δ.
+pub(super) fn msa_functional<T: DualNum<f64> + Copy>(
+    gamma: T,
+    rho: &[T],
+    z: &[f64],
+    d: &[T],
+    bjerrum_length: T,
+    delta: T,
+) -> T {
+    let eta = eta(gamma, rho, z, d, delta);
+    let mut sum = T::zero();
+    for ((&r, &z), &d) in rho.iter().zip(z).zip(d) {
+        sum += r * z * (gamma * z + eta * d) / (gamma * d + 1.0);
+    }
+    gamma.powi(3) / (3.0 * PI) - bjerrum_length * sum
+}
+
 /// η of the MSA (Maribo-Mogensen et al. 2012, eqs. 26-27)
-fn eta<T: DualNum<f64> + Copy>(gamma: T, rho: &[T], z: &[f64], d: &[T], delta: T) -> T {
+pub(super) fn eta<T: DualNum<f64> + Copy>(gamma: T, rho: &[T], z: &[f64], d: &[T], delta: T) -> T {
     let mut sum_z = T::zero();
     let mut sum_d3 = T::zero();
     for ((&r, &z), &d) in rho.iter().zip(z).zip(d) {
@@ -118,7 +141,7 @@ fn closure_residual<T: DualNum<f64> + Copy>(
 /// Screening parameter Γ: Newton iteration in the number type D (exact derivatives with
 /// respect to everything that D carries), started from the solution for η = 0 and equal
 /// diameters, safeguarded by the bracket 0 < Γ <= κ/2.
-fn screening_parameter<D: DualNum<f64> + Copy>(
+pub(super) fn screening_parameter<D: DualNum<f64> + Copy>(
     rho: &[D],
     z: &[f64],
     d: &[D],

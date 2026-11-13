@@ -2,10 +2,11 @@
 
 Model: ePCP-SAFT (feos `EquationOfState.epcpsaft`, variant "dh" (Debye-Hückel) or "msa" (mean spherical approximation,
 packing term over the ions or over all species)) with fixed PCP-SAFT water (parameters/epcpsaft/esper2023.json).
-Fitted per ion: sigma, epsilon_k, k_ij(water, ion), dipole_scaling (a11 mu^2), correlation_integral_parameter (a2);
-global: born_delta_cation, born_delta_anion; nuisance: one offset of the apparent molar heat capacity per salt system
-and temperature (ideal-gas heat capacity of the ions, not part of the residual model). Not fitted (fixed):
-polarizability_scaling (= 0), cation-anion k_ij (= 0; like-charged ions: 1 in feos).
+Fitted per ion: sigma, epsilon_k, k_ij(water, ion), dipole_scaling (a11 mu^2), correlation_integral_parameter (a2;
+or a2 of water for all ions, `permittivity_variant` "PT1"); global: born_delta_cation, born_delta_anion. Apparent molar
+heat capacities (`Model` cp_model): residual model plus the ideal-gas heat capacities of the ions (`ideal_gas_cp`),
+or an adjusted offset per salt system, composition and temperature. Not fitted (fixed): polarizability_scaling (= 0),
+cation-anion k_ij (= 0; like-charged ions: 1 in feos). Bounds (BOUNDS) only where physics requires them.
 
 Exact symmetries of the model (no data can determine them):
 - permittivity gauge: a_i -> a_i + c z_i (a = dipole_scaling or correlation_integral_parameter) leaves every
@@ -54,12 +55,15 @@ M_W = ed.M_W
 ION_PARAMETERS = ("sigma", "epsilon_k", "k_w", "dipole_scaling", "correlation_integral_parameter")
 GLOBAL_PARAMETERS = ("born_delta_cation", "born_delta_anion")
 # optimizer bounds and multistart sampling box per parameter type
-BOUNDS = {"sigma": (1.5, 6.0), "epsilon_k": (1.0, 3000.0), "k_w": (-1.5, 1.5), "dipole_scaling": (-50.0, 50.0),
-          "correlation_integral_parameter": (-2.0, 2.0), "born_delta_cation": (-1.0, 1.0),
-          "born_delta_anion": (-1.0, 1.0), "Cp_offset": (-np.inf, np.inf)}
+# bounds only where physics requires them: sigma > 0, eps_k >= 0, ion-water dispersion energy
+# sqrt(eps_i eps_w) (1 - k_iw) >= 0, i.e. k_iw <= 1
+BOUNDS = {"sigma": (0.0, np.inf), "epsilon_k": (0.0, np.inf), "k_w": (-np.inf, 1.0),
+          "dipole_scaling": (-np.inf, np.inf), "correlation_integral_parameter": (-np.inf, np.inf),
+          "born_delta_cation": (-np.inf, np.inf), "born_delta_anion": (-np.inf, np.inf), "Cp_offset": (-np.inf, np.inf),
+          "ion_pairing": (-np.inf, np.inf)}
 SAMPLING = {"sigma": (2.0, 4.5), "epsilon_k": (50.0, 2000.0), "k_w": (-0.5, 0.5), "dipole_scaling": (0.0, 12.0),
             "correlation_integral_parameter": (0.0, 0.5), "born_delta_cation": (-0.3, 0.3),
-            "born_delta_anion": (-0.3, 0.3), "Cp_offset": (0.0, 0.0)}
+            "born_delta_anion": (-0.3, 0.3), "Cp_offset": (0.0, 0.0), "ion_pairing": (-2.0, 2.0)}
 # exact symmetries (see module docstring): parameters of a reference ion fixed per group of connected ions
 GAUGE_PARAMETERS = ("dipole_scaling", "correlation_integral_parameter", "epsilon_k")
 REFERENCE_ION = "chloride ion"
@@ -67,7 +71,7 @@ REFERENCE_ION = "chloride ion"
 REFERENCE_EPSILON_K = {"chloride ion": 170.0}     # Held et al. (2014)
 # typical magnitudes (scaling of the Jacobian in the identifiability analysis)
 TYPICAL = {"sigma": 1.0, "epsilon_k": 100.0, "k_w": 0.1, "dipole_scaling": 1.0, "correlation_integral_parameter": 0.1,
-           "born_delta_cation": 0.1, "born_delta_anion": 0.1, "Cp_offset": 10.0}
+           "born_delta_cation": 0.1, "born_delta_anion": 0.1, "Cp_offset": 10.0, "ion_pairing": 1.0}
 METRICS = ("MAD", "MARD%", "RMSE", "RMSRE%", "bias", "rel_bias%", "max_AD", "max_RD%")
 
 
@@ -102,8 +106,10 @@ class ParameterSet:
     water: dict = field(default_factory=dict)
 
     @classmethod
-    def new(cls, ions, pure, k_w, water, born_delta=(0.0, 0.0), cp_blocks=(), fixed=()):
-        """`fixed`: iterable of (ion, parameter type) that are not adjusted (e.g. the gauge of the reference ion)"""
+    def new(cls, ions, pure, k_w, water, born_delta=(0.0, 0.0), cp_blocks=(), fixed=(), pairs=()):
+        """`fixed`: iterable of (ion, parameter type) that are not adjusted (e.g. the gauge of the reference ion);
+        `pairs`: (cation, anion) pairs with the ion-pairing parameter (logarithm of the factor of the Bjerrum
+        association constant, start value 0; key "cation|anion"; variants "bidh" and "bimsa")"""
         names, x = [], []
         for ion in ions:
             r = pure[ion]
@@ -116,6 +122,8 @@ class ParameterSet:
             names.append(("global", None, p)); x.append(v)
         for b in cp_blocks:
             names.append(("Cp_offset", b, "Cp_offset")); x.append(0.0)
+        for c, a in pairs:
+            names.append(("pair", f"{c}|{a}", "ion_pairing")); x.append(0.0)
         free = np.array([(n[1], n[2]) not in set(fixed) for n in names])
         return cls(list(ions), {i: pure[i] for i in ions}, names, np.array(x, float), free, water)
 
@@ -156,7 +164,15 @@ class ParameterSet:
                 "correlation_integral_parameter": float(v["correlation_integral_parameter"])}})
             pure.append(r)
             binary.append({"id1": {"name": "water"}, "id2": {"name": ion}, "k_ij": float(v["k_w"])})
+        for i, n in enumerate(self.names):
+            if n[0] == "pair":
+                c, a = n[1].split("|")
+                binary.append({"id1": {"name": c}, "id2": {"name": a}, "k_ij": 0.0, "ion_pairing": float(x[i])})
         return pure, binary
+
+    def pairs(self):
+        """(cation, anion, index in x) of the ion-pairing parameters"""
+        return [(*n[1].split("|"), i) for i, n in enumerate(self.names) if n[0] == "pair"]
 
     def born_delta(self, x):
         return [x[self.index("global", None, p)] for p in GLOBAL_PARAMETERS]
@@ -166,19 +182,33 @@ class ParameterSet:
 class Model:
     """Target quantities of all points and their derivatives with respect to the parameter vector."""
 
-    def __init__(self, parameters, points, variant="dh", msa_packing="ions"):
+    def __init__(self, parameters, points, variant="dh", msa_packing="ions", cp_model="ideal_gas",
+                 cp_electronic=False, reactions=()):
         """variant: term for the ion-ion interactions, "dh" (Debye-Hückel) or "msa" (mean spherical approximation);
-        msa_packing: species in the packing term of the MSA, "ions" (primitive model) or "total" (all species)"""
+        msa_packing: species in the packing term of the MSA, "ions" (primitive model) or "total" (all species);
+        cp_model: apparent molar heat capacity = residual part of the model plus
+          "ideal_gas": the ideal-gas heat capacities of the ions (ideal_gas_cp), no adjustable parameter;
+          "offset": one adjusted offset per Cp block (parameters "Cp_offset" of the parameter set, cp_block);
+          "residual": nothing (residual convention);
+        cp_electronic: with cp_model "ideal_gas", include the electronic heat capacity of the ions (electronic_cp);
+        reactions: reaction equilibria (e.g. REACTIONS) of the systems that contain all reactants or all products of a
+          reaction (system_species); the compositions of the data are stoichiometric, every reactant that is the
+          only reactant of a reaction is replaced by its products in the amounts passed to feos (basis_moles)"""
+        if cp_model not in ("ideal_gas", "offset", "residual"):
+            raise ValueError(f"cp_model {cp_model!r}")
         self.par = parameters
         self.points = points
         self.variant = variant
         self.msa_packing = msa_packing
+        self.cp_model = cp_model
+        self.cp_electronic = cp_electronic
+        self.reactions = tuple(reactions)
         self.systems = {}
         for k, pt in enumerate(points):
-            self.systems.setdefault(pt.ions, []).append(k)
+            self.systems.setdefault(system_species(pt.ions, self.reactions), []).append(k)
         missing = {i for ions in self.systems for i in ions} - set(parameters.ions)
         if missing:
-            raise ValueError(f"no parameters for ions {sorted(missing)}")
+            raise ValueError(f"no parameters for ions {sorted(missing)} (model_ions gives all species)")
         # IAPWS density of pure water at the states of density points (independent of the parameters)
         self.rho_w = {(p.T, p.p): iapws.rho_w(p.T, p.p) for p in points if p.target == "density"}
 
@@ -187,7 +217,8 @@ class Model:
         pure = {r["identifier"]["name"]: r for r in pure}
         recs = [feos.PureRecord.from_json_str(json.dumps({k: v for k, v in self.par.water.items() if k != "source"}))]
         recs += [feos.PureRecord.from_json_str(json.dumps(pure[i])) for i in ions]
-        brs = [feos.BinaryRecord.from_json_str(json.dumps(b)) for b in binary if b["id2"]["name"] in ions]
+        brs = [feos.BinaryRecord.from_json_str(json.dumps(b)) for b in binary
+               if b["id2"]["name"] in ions and (b["id1"]["name"] == "water" or b["id1"]["name"] in ions)]
         return feos.Parameters.from_records(recs, brs, feos.IdentifierOption.Name)
 
     def _derivatives(self, ions):
@@ -199,6 +230,10 @@ class Model:
                 spec.append((name, idx)); cols.append(self.par.index("ion", ion, p))
         for p in GLOBAL_PARAMETERS:
             spec.append((p, [])); cols.append(self.par.index("global", None, p))
+        if self.variant in ("bidh", "bimsa"):
+            for c, a, k in self.par.pairs():
+                if c in ions and a in ions:
+                    spec.append(("ion_pairing", [ions.index(c) + 1, ions.index(a) + 1])); cols.append(k)
         return spec, cols
 
     @staticmethod
@@ -218,12 +253,14 @@ class Model:
             rows, owner = [], []
             for k in idx:
                 pt = self.points[k]
-                rows.append([pt.T, pt.p] + self._moles(ions, pt.composition)); owner.append((k, 0))
+                rows.append([pt.T, pt.p] + basis_moles(ions, pt.composition, self.reactions)); owner.append((k, 0))
                 if pt.target == "dil_H":
-                    rows.append([pt.T, pt.p] + self._moles(ions, pt.composition_final)); owner.append((k, 1))
+                    rows.append([pt.T, pt.p] + basis_moles(ions, pt.composition_final, self.reactions))
+                    owner.append((k, 1))
             v, g, ok = feos.Property.electrolyte_properties_derivatives(
                 params, spec, np.array(rows), solvent=0, epcpsaft_variant=self.variant,
-                msa_packing=self.msa_packing, born_delta_cation=d_cat, born_delta_anion=d_an)
+                msa_packing=self.msa_packing, born_delta_cation=d_cat, born_delta_anion=d_an,
+                reactions=feos_reactions(ions, self.reactions), solvent_molar_mass=M_W)
             state = {o: (_row(v, j), _row(g, j) if jacobian else None, ok[j]) for j, o in enumerate(owner)}
             for k in idx:
                 pt = self.points[k]
@@ -245,8 +282,7 @@ class Model:
         mi = ed.ions_of(pt.composition)
         nu_m = sum(mi.values())
         m_salt = sum(pt.composition.values())
-        moles = self._moles(ions, pt.composition)
-        x_w = moles[0] / sum(moles)
+        basis = basis_moles(ions, pt.composition, self.reactions)
         gz = (lambda key, *i: g[key][i] if i else g[key]) if g is not None else (lambda key, *i: 0.0)
         extra = None
         if pt.target == "phi":
@@ -254,11 +290,20 @@ class Model:
         elif pt.target == "ln_aw":
             val, d = v["ln_solvent_activity"], gz("ln_solvent_activity")
         elif pt.target == "gamma_pm":
-            salt = next(iter(pt.composition))
+            # stoichiometric mean ionic activity coefficient (molality scale) of the electrolyte:
+            # gamma_pm^nu = prod_i (m_i gamma_i^m / m_i^st)^nu_i over its ions, m_i (true) and gamma_i^m of the
+            # (equilibrium) solution, m_i^st the stoichiometric molality of ion i; amounts per kg water: m_i = n_i
+            salt = pt.electrolyte or next(iter(pt.composition))
             nu = ed.SALTS[salt]
+            n = v["moles"]
+            x_w = n[0] / n.sum()
+            dn = g["moles"] if g is not None else 0.0
+            d_ln_xw = -(dn.sum(axis=0)) / n.sum() if g is not None else 0.0
             c = {i: 1 + ions.index(i) for i in nu}
-            ln_g = sum(n * (v["ln_gamma"][c[i]] + np.log(x_w)) for i, n in nu.items()) / sum(nu.values())
-            d_ln = sum(n * gz("ln_gamma", c[i]) for i, n in nu.items()) / sum(nu.values())
+            ln_g = sum(k * (np.log(n[c[i]] / mi[i]) + v["ln_gamma"][c[i]] + np.log(x_w))
+                       for i, k in nu.items()) / sum(nu.values())
+            d_ln = sum(k * ((dn[c[i]] / n[c[i]] if g is not None else 0.0) + gz("ln_gamma", c[i]) + d_ln_xw)
+                       for i, k in nu.items()) / sum(nu.values())
             val, d = np.exp(ln_g), np.exp(ln_g) * d_ln
         elif pt.target == "density":
             mass = 1.0 + sum(self.par.records[i]["molarweight"] / 1000 * mi[i] for i in mi)
@@ -267,13 +312,17 @@ class Model:
         elif pt.target == "V_phi":
             val, d = v["volume_difference"] / m_salt, gz("volume_difference") / m_salt
         elif pt.target == "Cp_phi":
-            j = self.par.index("Cp_offset", cp_block(pt), "Cp_offset")
             key = "residual_heat_capacity_difference"
-            val, d = v[key] / m_salt + x[j], gz(key) / m_salt
-            extra = (j, 1.0)
+            val, d = v[key] / m_salt, gz(key) / m_salt
+            if self.cp_model == "offset":
+                j = self.par.index("Cp_offset", cp_block(pt), "Cp_offset")
+                val, extra = val + x[j], (j, 1.0)
+            elif self.cp_model == "ideal_gas":
+                val += sum(nb * ideal_gas_cp(i, pt.T, self.cp_electronic)
+                           for i, nb in zip(ions, basis[1:]) if nb > 0) / m_salt
         elif pt.target == "dil_H":
             vf, g_final, _ = s1
-            key = "residual_enthalpy_difference"
+            key = "relative_enthalpy"
             ratio = m_salt / sum(pt.composition_final.values())
             val = (ratio * vf[key] - v[key]) / m_salt
             d = (ratio * (g_final[key] if g_final is not None else 0.0) - gz(key)) / m_salt
@@ -282,9 +331,128 @@ class Model:
         return val, (d, extra)
 
 
+# reaction equilibria (molality scale, ln K(T) of feos ReactionEquilibrium, Knopf et al. 2003, eq. 16): nu over species,
+# ln K at t0, Delta H / R (K), Delta c_p / R, (d Delta c_p / dT) / R (1/K) at t0
+REACTIONS = (
+    dict(name="HSO4- = H+ + SO4 2-", nu={"hydrogen-sulfate": -1, "hydronium": 1, "sulfate": 1},
+         ln_k0=float(np.log(1.0576e-2)), t0=298.15, dh0=-2231.620793, dcp0=-24.7273, dcp_dt=-0.11967,
+         source="Knopf, Luo, Krieger, Koop, J. Phys. Chem. A 107 (2003) 4322, Table 2"),
+)
+
+
+def _relevant(reaction, species):
+    """a reaction takes part if all its reactants or all its products are present"""
+    s = set(species)
+    reactants = {i for i, n in reaction["nu"].items() if n < 0}
+    products = {i for i, n in reaction["nu"].items() if n > 0}
+    return reactants <= s or products <= s
+
+
+def system_species(ions, reactions=()):
+    """species of a system: its ions and all species of the reactions that take part"""
+    species = set(ions)
+    changed = True
+    while changed:
+        changed = False
+        for r in reactions:
+            if _relevant(r, species) and not set(r["nu"]) <= species:
+                species |= set(r["nu"])
+                changed = True
+    return tuple(sorted(species))
+
+
+def model_ions(points, reactions=()):
+    """all species of the systems of `points` (ions of the parameter set)"""
+    return sorted({i for p in points for i in system_species(p.ions, reactions)})
+
+
+def basis_moles(species, composition, reactions=()):
+    """amounts (water 1/M_w, then `species`) of the stoichiometric `composition`, with every species that is the
+    only reactant of a reaction taking part replaced by the products of that reaction"""
+    mi = dict(ed.ions_of(composition))
+    for r in reactions:
+        if not _relevant(r, species):
+            continue
+        reactants = [i for i, n in r["nu"].items() if n < 0]
+        if len(reactants) == 1 and mi.get(reactants[0], 0.0) > 0:
+            a = mi.pop(reactants[0]) / -r["nu"][reactants[0]]
+            for i, n in r["nu"].items():
+                if n > 0:
+                    mi[i] = mi.get(i, 0.0) + n * a
+    return [1.0 / M_W] + [mi.get(i, 0.0) for i in species]
+
+
+def feos_reactions(species, reactions=()):
+    """reactions taking part in the system `species` in the format of feos (stoichiometry over water and species)"""
+    return [([0.0] + [float(r["nu"].get(i, 0)) for i in species], r["ln_k0"], r["t0"], r["dh0"], r["dcp0"],
+             r["dcp_dt"]) for r in reactions if _relevant(r, species)]
+
+
 def _row(results, j):
     """row j of the dict of result arrays of feos.Property.electrolyte_properties_derivatives"""
     return {k: a[j] for k, a in results.items()}
+
+
+R = 8.314462618
+# ideal-gas heat capacity of ions (gas-phase ions as reference state of the residual model):
+# c_p = 5/2 R (translation and pV) + rotation (R linear, 3/2 R nonlinear) + harmonic vibrations (Einstein functions);
+# electronic contributions are not included. Vibrational wavenumbers in cm^-1 with degeneracy: fundamentals of the ions
+# in aqueous solution (Nakamoto, Infrared and Raman Spectra of Inorganic and Coordination Compounds, Part A, 6th ed.,
+# Wiley 2009).
+MONATOMIC_IONS = {"hydronium", "lithium ion", "sodium ion", "potassium ion", "rubidium ion", "cesium ion",
+                  "silver ion", "thallium ion", "magnesium ion", "calcium ion", "strontium ion", "barium ion",
+                  "manganese ion", "iron(2+) ion", "cobalt ion", "nickel ion", "copper ion", "zinc ion",
+                  "cadmium ion", "lead ion", "beryllium ion", "aluminium ion", "fluoride ion", "chloride ion",
+                  "bromide ion", "iodide ion"}
+POLYATOMIC_IONS = {   # ion: (linear, [(wavenumber / cm^-1, degeneracy), ...])
+    "hydroxide": (True, [(3555.0, 1)]),
+    "ammonium ion": (False, [(3040.0, 1), (1680.0, 2), (3145.0, 3), (1400.0, 3)]),
+    "nitrate ion": (False, [(1050.0, 1), (831.0, 1), (1390.0, 2), (720.0, 2)]),
+    "sulfate": (False, [(983.0, 1), (450.0, 2), (1105.0, 3), (611.0, 3)]),
+    "perchlorate ion": (False, [(935.0, 1), (460.0, 2), (1100.0, 3), (630.0, 3)]),
+    "carbonate": (False, [(1063.0, 1), (879.0, 1), (1415.0, 2), (680.0, 2)]),
+    "chlorate ion": (False, [(930.0, 1), (610.0, 1), (975.0, 2), (480.0, 2)]),
+    "bromate ion": (False, [(805.0, 1), (418.0, 1), (805.0, 2), (358.0, 2)]),
+    "thiocyanate ion": (True, [(2066.0, 1), (743.0, 1), (486.0, 2)]),
+}
+C2_CM_K = 1.438776877  # second radiation constant h c / k_B in cm K
+# electronic levels of the free ions (degeneracy 2J+1, energy / cm^-1): all levels below 10000 cm^-1 (the next levels
+# lie above 14000 cm^-1); NIST Atomic Spectra Database, retrieved 2026-11-09 (Mn III, Ni III: Sugar and Corliss 1985;
+# Fe III: Ekberg 1993, Sugar and Corliss 1985; Co III: Smillie et al. 2016; Cu III: Sugar and Musgrove 1990). Ions not
+# listed have no level below 10000 cm^-1 that contributes (closed shells, Mn2+ 3d5 6S).
+ELECTRONIC_LEVELS = {
+    "manganese ion": [(6, 0.0)],
+    "iron(2+) ion": [(9, 0.0), (7, 436.19), (5, 738.87), (3, 932.52), (1, 1027.26)],
+    "cobalt ion": [(10, 0.0), (8, 841.36), (6, 1451.33), (4, 1867.50)],
+    "nickel ion": [(9, 0.0), (7, 1360.7), (5, 2269.6)],
+    "copper ion": [(6, 0.0), (4, 2071.69)],
+}
+
+
+def electronic_cp(ion, T):
+    """electronic heat capacity of a free ion [J/(mol K)]: R (<e^2> - <e>^2), e = E / (k T), Boltzmann distribution
+    over ELECTRONIC_LEVELS (0 for ions without listed levels)"""
+    levels = ELECTRONIC_LEVELS.get(ion, [(1, 0.0)])
+    e = np.array([C2_CM_K * E / T for _, E in levels])
+    w = np.array([g for g, _ in levels]) * np.exp(-e)
+    w /= w.sum()
+    return R * (w @ e ** 2 - (w @ e) ** 2)
+
+
+def ideal_gas_cp(ion, T, electronic=False):
+    """ideal-gas isobaric heat capacity of an ion [J/(mol K)] (MONATOMIC_IONS, POLYATOMIC_IONS); with `electronic`,
+    the electronic contribution of electronic_cp is added"""
+    el = electronic_cp(ion, T) if electronic else 0.0
+    if ion in MONATOMIC_IONS:
+        return 2.5 * R + el
+    if ion not in POLYATOMIC_IONS:
+        raise ValueError(f"no ideal-gas heat capacity for {ion!r}")
+    linear, modes = POLYATOMIC_IONS[ion]
+    vib = 0.0
+    for nu, g in modes:
+        u = C2_CM_K * nu / T
+        vib += g * u ** 2 * np.exp(u) / np.expm1(u) ** 2
+    return R * (2.5 + (1.0 if linear else 1.5) + vib) + el
 
 
 def cp_block(pt):
@@ -293,6 +461,12 @@ def cp_block(pt):
     m = sum(pt.composition.values())
     y = ",".join(f"{s}:{v / m:.4f}" for s, v in sorted(pt.composition.items())) if len(pt.composition) > 1 else ""
     return f"{pt.system}{'[' + y + ']' if y else ''}@{pt.T:.2f}"
+
+
+def cp_isotherm(pt):
+    """isotherm and isobar of the apparent molar heat capacity (cp_block and pressure): group of the removed offset
+    (Objective.remove_cp_offset)"""
+    return f"{cp_block(pt)}@{pt.p / 1e5:.1f}bar"
 
 
 iapws = ed.iapws
@@ -310,13 +484,21 @@ def huber(r, delta):
 
 @dataclass
 class Objective:
-    """Huber objective with weights w_b / N_b per block (system, property), as in Esper et al. (2023)."""
+    """Huber objective with weights w_b / N_b per block (system, property), as in Esper et al. (2023), or (with
+    block_normalization=False) w_b for every point."""
     model: Model
     delta: float = 0.05
     weights: dict = field(default_factory=dict)    # property -> w (default 1)
+    # True: w_b / N_b per block (Esper et al. 2023); False: weight w_b for every point (blocks with more points weigh more)
+    block_normalization: bool = True
     # r of a point that did not converge; None: NaN, so that least_squares rejects the step (a fixed value would make
     # non-convergence attractive for points with |r| above it)
     failure_residual: float = None
+    # True: apparent molar heat capacities enter as deviations from their mean per isotherm and isobar (cp_isotherm),
+    # i.e. calc - exp minus its mean over the group: the infinite-dilution (standard-state) value Cp_phi^0(T, p) of
+    # every isotherm is removed and only the concentration dependence Cp_phi - Cp_phi^0 is fitted; groups with one point
+    # carry no information (residual 0)
+    remove_cp_offset: bool = False
 
     def __post_init__(self):
         pts = self.model.points
@@ -326,7 +508,7 @@ class Objective:
         self.block = np.array([self.block_names.index(b) for b in blocks])
         n_b = np.bincount(self.block)
         w = np.array([self.weights.get(b[1], 1.0) for b in self.block_names])
-        self.sqrt_w = np.sqrt(w[self.block] / n_b[self.block])
+        self.sqrt_w = np.sqrt(w[self.block] / (n_b[self.block] if self.block_normalization else 1.0))
         scale = np.ones(len(pts))
         for b in range(len(self.block_names)):
             sel = self.block == b
@@ -341,6 +523,10 @@ class Objective:
         if zero:
             raise ValueError(f"residual scale zero (all values of a block zero, or zero depression/elevation): {zero}")
         self.scale = scale
+        groups = [cp_isotherm(p) if (self.remove_cp_offset and p.target == "Cp_phi") else None for p in pts]
+        names = sorted({g for g in groups if g is not None})
+        self.cp_group = np.array([names.index(g) if g is not None else -1 for g in groups])
+        self.cp_group_size = np.bincount(self.cp_group[self.cp_group >= 0], minlength=len(names))
         self._values = (None, None)
         self._jacobian = (None, None)
 
@@ -361,8 +547,24 @@ class Objective:
     def _psi(self, r):
         return huber(r, self.delta)
 
+    def _without_offset(self, d):
+        """d (n or n x k, deviations or their derivatives) with the mean over every Cp group removed (finite rows only)"""
+        if not np.any(self.cp_group >= 0):
+            return d
+        d = np.array(d, float)
+        for g in np.unique(self.cp_group[self.cp_group >= 0]):
+            rows = np.flatnonzero(self.cp_group == g)
+            ok = rows[np.isfinite(d[rows]).reshape(len(rows), -1).all(axis=1)]
+            if len(ok):
+                d[rows] = d[rows] - np.mean(d[ok], axis=0)
+        return d
+
+    def deviations(self, calc):
+        """calc - exp, for apparent molar heat capacities with the offset per group removed (remove_cp_offset)"""
+        return self._without_offset(calc - self.exp)
+
     def _residual(self, calc):
-        r = (calc - self.exp) / self.scale
+        r = self.deviations(calc) / self.scale
         failed = ~np.isfinite(r)
         r[failed] = np.nan if self.failure_residual is None else self.failure_residual
         return r, failed
@@ -377,7 +579,11 @@ class Objective:
         calc, jac = self._evaluate(par.full(x_free), jacobian=True)
         r, failed = self._residual(calc)
         _, dpsi = self._psi(np.where(failed, 0.0, r))
-        J = (self.sqrt_w * dpsi / self.scale)[:, None] * jac[:, par.free]
+        jac = jac[:, par.free]
+        if np.any(self.cp_group >= 0):
+            jac = np.where(failed[:, None], np.nan, jac)
+            jac = np.nan_to_num(self._without_offset(jac), nan=0.0)
+        J = (self.sqrt_w * dpsi / self.scale)[:, None] * jac
         J[failed] = 0.0
         return J
 
@@ -387,6 +593,9 @@ class Objective:
 
 
 # ---------------------------------------------------------------- optimization
+S_MIN = 1e-6   # lower bound of s = sqrt(epsilon_k / K) in the optimizer variables (epsilon_k >= 1e-12 K)
+
+
 class Problem:
     """Objective in the variables of the optimizer.
 
@@ -455,7 +664,8 @@ class Problem:
         for ie, ik, eps in self.pairs:
             k_lo, k_hi = lo[ik], hi[ik]
             if ie is not None:
-                s_lo, s_hi = np.sqrt(lo[ie]), np.sqrt(hi[ie])
+                # s >= S_MIN: at s = 0 the chain rule of the variables (division by s) is undefined
+                s_lo, s_hi = max(np.sqrt(lo[ie]), S_MIN), np.sqrt(hi[ie])
                 lo[ie], hi[ie] = s_lo, s_hi
             else:
                 s_lo = s_hi = np.sqrt(eps)
@@ -528,24 +738,32 @@ def waterfall(results, rtol=1e-3):
     return costs, int(np.sum(costs <= best * (1 + rtol)))
 
 
-def classify(results, par, rtol_cost=1e-3, tol_x=1e-2):
-    """Classify the converged (polished) results of a multistart:
-    - "unimodal": the best cost is reached by several starts with the same parameters (within tol_x in units of TYPICAL);
-    - "flat": the best cost is reached by several starts with different parameters (directions the data do not
-      determine; not a problem of the optimizer);
-    - "multimodal": converged starts end at different costs (distinct local minima: use `cma_es`);
+def classify(results, par, problem=None, rtol_cost=1e-2, tol_x=1e-2, atol_cost=1e-12, max_nfev=None):
+    """Classify the converged (polished) results of a multistart. With `problem`, every polished result is first
+    converged again with tight tolerances (xtol = ftol = gtol = 1e-12, at most `max_nfev` evaluations), so that results
+    that stopped early in a flat valley are not counted as different minima. Then, relative to the best result:
+    - "multimodal": a result with a cost higher by more than rtol_cost (relative, at least atol_cost) and parameters
+      different by more than tol_x (in units of TYPICAL): distinct local minima (use `cma_es`);
+    - "flat": all costs within rtol_cost, parameters different by more than tol_x: directions the data do not determine;
+    - "unimodal": all costs within rtol_cost and parameters within tol_x;
     - "undecided": fewer than two converged starts.
     Returns (class, details)."""
     pol = [r for r in results if r["polished"] and np.isfinite(r["cost"])]
     if len(pol) < 2:
         return "undecided", {"converged": len(pol)}
-    best = pol[0]["cost"]
-    same = [r for r in pol if r["cost"] <= best * (1 + rtol_cost)]
+    if problem is not None:
+        for r in pol:
+            res = fit(problem, r["y"], max_nfev=max_nfev, xtol=1e-12, ftol=1e-12, gtol=1e-12)
+            r.update(y=res.x, cost=res.cost, status=res.status, optimality=res.optimality, x=problem.x_free(res.x))
+        pol.sort(key=lambda r: r["cost"])
+    best = pol[0]
     scale = np.array([TYPICAL[n[2]] for n, f in zip(par.names, par.free) if f])
-    if len(same) < len(pol):
-        return "multimodal", {"costs": [r["cost"] for r in pol]}
-    spread = max(np.max(np.abs(r["x"] - same[0]["x"]) / scale) for r in same)
-    return ("unimodal" if spread <= tol_x else "flat"), {"costs": [r["cost"] for r in pol], "spread": spread}
+    dx = [float(np.max(np.abs(r["x"] - best["x"]) / scale)) for r in pol]
+    higher = [r["cost"] > best["cost"] * (1 + rtol_cost) + atol_cost for r in pol]
+    details = {"costs": [r["cost"] for r in pol], "spread": max(dx)}
+    if any(h and d > tol_x for h, d in zip(higher, dx)):
+        return "multimodal", details
+    return ("unimodal" if max(dx) <= tol_x else "flat"), details
 
 
 def cma_es(problem, y0, sigma0=0.2, max_evals=2000, popsize=None, seed=0, verbose=False):
@@ -608,38 +826,60 @@ def block_metrics(objective, par, x):
     "linearized" residuals the model value of the measured quantity (a_w, p, freezing-point depression, boiling-point
     elevation) is measured * (1 + r) (first order in r)"""
     calc, _ = objective.model.evaluate(x, jacobian=False)
+    calc = objective.exp + objective.deviations(calc)     # heat capacities without the offset per group (if removed)
     measured = np.array([p.measured for p in objective.model.points])
     linearized = np.array([p.residual == "linearized" for p in objective.model.points])
     calc = np.where(linearized, measured * (1 + (calc - objective.exp) / objective.scale), calc)
     exp = np.where(linearized, measured, objective.exp)
+    # heat capacities of isotherms with one point carry no information once the offset is removed: not counted
+    sizes = np.append(objective.cp_group_size, 0)        # index -1 (not a heat capacity): size 0
+    single = sizes[objective.cp_group] == 1
     out = {}
     for b, name in enumerate(objective.block_names):
-        sel = (objective.block == b) & np.isfinite(calc)
+        sel = (objective.block == b) & np.isfinite(calc) & ~single
         out[name] = metrics(calc[sel], exp[sel]) if sel.any() else {"n": 0}
         out[name]["failed"] = int(np.sum((objective.block == b) & ~np.isfinite(calc)))
     return out
 
 
-def identifiability(objective, par, x):
+def identifiability(objective, par, x, problem=None):
     """singular values of the Jacobian (columns scaled by the typical magnitudes TYPICAL) at the full parameter vector x
     and the parameter combinations of the smallest ones; rough standard errors from (J^T J)^-1 * 2 cost / (n - p)
     (Gauss-Newton approximation that ignores the Huber weighting and assumes equal variances of the weighted
-    residuals)"""
+    residuals). The pseudo-inverse is taken of the Jacobian with columns scaled to unit norm, so that the cutoff of
+    small singular values does not depend on the units of the parameters.
+    With `problem` (Problem), everything refers to the variables of the optimizer: for every ion with
+    cross_energies, epsilon_k and k_w are replaced by s = sqrt(epsilon_k) ("sqrt_epsilon_k[ion]") and
+    u = sqrt(epsilon_k) (1 - k_w) ("u[ion]"); "labels" and "values" give names and values of the variables."""
     par = par.at(x)
     x_free = x[par.free]
-    J = objective.jacobian(x_free, par)
-    scale = np.array([TYPICAL[n[2]] for n, f in zip(par.names, par.free) if f])
-    U, s, Vt = np.linalg.svd(J * scale, full_matrices=False)
     labels = par.labels()
+    scale = np.array([TYPICAL[n[2]] for n, f in zip(par.names, par.free) if f])
+    if problem is None:
+        J = objective.jacobian(x_free, par)
+        values = x_free
+    else:
+        values = problem.to_y(x_free)
+        J = problem.jacobian(values)
+        labels = list(labels)
+        for ie, ik, _ in problem.pairs:
+            if ie is not None:
+                labels[ie] = labels[ie].replace("epsilon_k[", "sqrt_epsilon_k[")
+                scale[ie] = np.sqrt(TYPICAL["epsilon_k"])
+            labels[ik] = labels[ik].replace("k_w[", "u[")
+            scale[ik] = np.sqrt(TYPICAL["epsilon_k"]) * TYPICAL["k_w"]
+    U, s, Vt = np.linalg.svd(J * scale, full_matrices=False)
     weakest = []
     for k in np.argsort(s)[:5]:
         v = Vt[k]
         top = np.argsort(-np.abs(v))[:4]
         weakest.append((s[k], [(labels[i], round(float(v[i]), 3)) for i in top]))
     n, p = J.shape
-    cov = np.linalg.pinv(J.T @ J) * 2 * objective.cost(x_free, par) / max(n - p, 1)
+    norm = np.linalg.norm(J, axis=0)
+    norm = np.where(norm > 0, norm, 1.0)
+    cov = np.linalg.pinv((J / norm).T @ (J / norm)) / np.outer(norm, norm) * 2 * objective.cost(x_free, par) / max(n - p, 1)
     return {"singular_values": s, "condition": s.max() / max(s.min(), 1e-300), "weakest": weakest,
-            "std_error": np.sqrt(np.clip(np.diag(cov), 0.0, None))}
+            "std_error": np.sqrt(np.clip(np.diag(cov), 0.0, None)), "labels": labels, "values": values}
 
 
 # ---------------------------------------------------------------- symmetries and gauge (MacInnes convention)

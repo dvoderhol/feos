@@ -19,7 +19,7 @@ mod vapor_pressure;
 pub use boiling_temperature::BoilingTemperature;
 pub use bubble_point_pressure::BubblePointPressure;
 pub use dew_point_pressure::DewPointPressure;
-pub use electrolyte::ElectrolyteProperties;
+pub use electrolyte::{ElectrolyteProperties, ReactionEquilibrium};
 pub use enthalpy_of_vaporization::EnthalpyOfVaporization;
 pub use equilibrium_liquid_density::EquilibriumLiquidDensity;
 pub use liquid_density::LiquidDensity;

@@ -29,11 +29,29 @@ over the ions only, `msa_packing="ions"` (primitive model), or over all species,
 of the solvent in Δ only, as Maribo-Mogensen et al. 2012; Ω and the equation for Γ keep the sums over the ions)).
 The Born diameter is the ion diameter 0.88σ plus `born_delta_cation` / `born_delta_anion`.
 Adjusted per ion: `sigma`, `epsilon_k`, k_ij(water, ion), `dipole_scaling` (a11μ²), `correlation_integral_parameter`
-(a2); global: `born_delta_cation`, `born_delta_anion`; nuisance: one offset of the apparent molar heat capacity per salt
-system, composition of the salt mixture and temperature (the ideal-gas heat capacity of the ions per mol of salt, not
-part of the residual model). Fixed: `polarizability_scaling` = 0, cation-anion k_ij = 0 (like-charged ions: 1 in feos).
-Ion permittivity parameters (`permittivity_variant`): "PT2" a11μ² and a2 per ion (Rueben et al. 2024); "PT1" a11μ² per
-ion and a2 of every ion equal to a2 of water (not adjusted).
+(a2); global: `born_delta_cation`, `born_delta_anion`. Fixed: `polarizability_scaling` = 0, cation-anion k_ij = 0
+(like-charged ions: 1 in feos). Ion permittivity parameters (`permittivity_variant`): "PT2" a11μ² and a2 per ion
+(Rueben et al. 2024); "PT1" a11μ² per ion and a2 of every ion equal to a2 of water (not adjusted).
+Bounds (`BOUNDS`) only where physics requires them: σ > 0, ε/k ≥ 0, ion-water dispersion energy ≥ 0 (k_iw ≤ 1; in the
+cross-energy variables s ≥ 0, u ≥ 0). The Sobol box `SAMPLING` only places starting points.
+
+Apparent molar heat capacities (`Model(cp_model=...)`): residual part of the model plus
+- `"ideal_gas"` (default): the ideal-gas heat capacities of the ions, `ideal_gas_cp`: 5/2 R (translation) plus
+  rotation and harmonic vibrations of polyatomic ions (fundamentals in aqueous solution, Nakamoto 2009); electronic
+  contributions of the free ions from the NIST levels (`electronic_cp`, `cp_electronic=True`; not used by default);
+- `"offset"`: one adjusted offset per salt system, composition and temperature (parameters `Cp_offset`);
+- `"residual"`: nothing (residual convention of the dummy data).
+
+Reaction equilibria (`Model(reactions=REACTIONS)`): HSO₄⁻ = H⁺ + SO₄²⁻ with ln K(T) of Knopf et al. (2003, Table 2,
+eq. 16; molality scale), solved in feos (`ElectrolyteProperties::with_reactions`, Newton for the extents with exact
+derivatives with respect to the parameters). A reaction takes part in a system that contains all its reactants or all
+its products (`system_species`; HSO₄⁻ is then an ion of the parameter set, `model_ions`); the compositions of the data
+are stoichiometric (H2SO4: 2 H⁺ + SO₄²⁻; NaHSO4: Na⁺ + HSO₄⁻, passed to feos as Na⁺ + H⁺ + SO₄²⁻). Targets: osmotic
+coefficient with the stoichiometric ion molalities; mean ionic activity coefficient γ±^ν = Π_i (m_i γ_i / m_i^st)^ν_i
+(true molalities and activity coefficients of the equilibrium, stoichiometric molalities m_i^st); enthalpies of
+dilution from the relative enthalpy L (feos `relative_enthalpy`, including Σ ξ_r ΔH°_r); heat capacities from the
+equilibrium heat capacity (central difference in T, feos) plus the ideal-gas heat capacities of the stoichiometric
+amounts.
 
 ### Exact symmetries
 
@@ -98,8 +116,12 @@ scatter search and a local optimizer was somewhat better).
 `block_metrics` gives absolute and relative deviations per block in the measured quantity (a_w, p, freezing-point
 depression and boiling-point elevation in K for the colligative data, to first order in the residual).
 
+`classify` re-polishes the converged starts with tight tolerances (with `problem`) and calls the problem multimodal only
+if a start ends with a cost higher by more than 1 % and different parameters (more than 0.01 in units of `TYPICAL`).
+
 `identifiability` gives the singular values of the scaled Jacobian, the parameter combinations of the smallest ones and
-rough standard errors.
+rough standard errors (pseudo-inverse of the Jacobian with columns scaled to unit norm); with `problem` in the optimizer
+variables (s = sqrt(epsilon_k), u = sqrt(epsilon_k) (1 - k_w)).
 
 ## Output
 

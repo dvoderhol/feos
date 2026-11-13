@@ -2,7 +2,8 @@
 
 Data format: one CSV file per data set, one row per value (format of the dummy data, ~/ePCP_dummy_data/README.md):
 dataset_id, source_type, reference, system, property, method, T_K, p_Pa, salt_1, m_1, salt_2, m_2, m_1_final, m_2_final,
-value, value_true, unit, u_value, convention, notes. Molalities in mol per kg water.
+value, value_true, unit, u_value, convention, notes; optional: electrolyte (salt of a mean ionic activity coefficient),
+split (data split). Molalities in mol per kg water. Salts beyond SALTS: _salts.json in the data folder.
 
 Every data point is reduced to a target quantity of the model and a residual definition; the reduction uses only
 pure-water reference data (IAPWS, ice), never the model. Residuals are relative deviations of the measured quantity,
@@ -21,6 +22,7 @@ water is T_MELT (data should be given as freezing-point depression relative to t
 The data are not modified on disk; filters select rows.
 """
 import glob
+import json
 import os
 import sys
 from dataclasses import dataclass, field
@@ -83,9 +85,23 @@ def data_path(path=None):
 
 
 def read(path=None):
-    """all data rows of all CSV files in `path` (files starting with '_' are skipped)"""
-    files = sorted(f for f in glob.glob(os.path.join(data_path(path), "*.csv")) if not os.path.basename(f).startswith("_"))
+    """all data rows of all CSV files in `path` (files starting with '_' are skipped); salts defined in
+    `path`/_salts.json ({salt: {ion: stoichiometric coefficient}}) are added to SALTS"""
+    folder = data_path(path)
+    load_salts(folder)
+    files = sorted(f for f in glob.glob(os.path.join(folder, "*.csv")) if not os.path.basename(f).startswith("_"))
     return pd.concat([pd.read_csv(f) for f in files], ignore_index=True)
+
+
+def load_salts(folder):
+    """add the salts of `folder`/_salts.json to SALTS (a salt already defined with other ions raises an error)"""
+    f = os.path.join(folder, "_salts.json")
+    if not os.path.exists(f):
+        return
+    for salt, ions in json.load(open(f)).items():
+        if salt in SALTS and SALTS[salt] != ions:
+            raise ValueError(f"salt {salt}: {ions} differs from {SALTS[salt]}")
+        SALTS[salt] = ions
 
 
 def ions_of(composition):
@@ -157,12 +173,18 @@ class Point:
     ions: tuple = ()
     scale: float = None          # residual scale of "linearized" points
     measured: float = np.nan     # measured quantity (a_w, p, freezing-point depression, boiling-point elevation or value)
+    electrolyte: str = ""        # salt of a mean ionic activity coefficient (first salt if empty)
+    split: str = ""              # data split of the row (column "split"; empty if the data have none)
 
 
-def reduce(df, value_column="value", properties=None):
+def reduce(df, value_column="value", properties=None, splits=None):
     """data rows -> list of Point (target quantities); rows with a property not in TARGETS or a salt not in SALTS are
-    skipped (returned as second element with the reason)"""
+    skipped (returned as second element with the reason); `splits`: only rows whose column "split" is in `splits`"""
     points, skipped = [], []
+    if splits is not None:
+        if "split" not in df:
+            raise ValueError("the data have no column 'split'")
+        df = df[df["split"].isin(splits)]
     for i, r in df.iterrows():
         prop = r["property"]
         if properties is not None and prop not in properties:
@@ -179,6 +201,12 @@ def reduce(df, value_column="value", properties=None):
             T, p, v, scale, measured = _linearized(prop, T, p, v)
         comp_f = _composition(r, final=True) if prop == "enthalpy_of_dilution" else {}
         ions = tuple(sorted(ions_of(comp)))
+        electrolyte = r.get("electrolyte", "")
+        electrolyte = electrolyte if isinstance(electrolyte, str) else ""
+        if target == "gamma_pm" and electrolyte and electrolyte not in comp:
+            skipped.append((i, f"electrolyte {electrolyte} not in the composition"))
+            continue
+        split = r.get("split", "")
         points.append(Point(i, r["dataset_id"], r["system"], prop, target, residual, T, p, comp, comp_f, v, ions,
-                            scale, measured))
+                            scale, measured, electrolyte, split if isinstance(split, str) else ""))
     return points, skipped

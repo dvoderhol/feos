@@ -54,6 +54,15 @@ dictionaries of values and derivatives with respect to the requested parameters,
 |`volume_difference`|volume of the solution minus volume of the pure solvent (m³)|
 |`residual_heat_capacity_difference`|residual isobaric heat capacity of the solution minus that of the pure solvent (J/K)|
 |`residual_enthalpy_difference`|residual enthalpy of the solution minus that of the pure solvent (J)|
+|`relative_enthalpy`|enthalpy of the solution minus that of the same amounts at the reference states (solutes at infinite dilution, solvent pure), incl. the reaction enthalpies (J)|
+|`moles`|amounts of all components, in chemical equilibrium if `reactions` are given (mol)|
+
+`reactions` (optional) is a list of reaction equilibria, each as (stoichiometric coefficients of all components,
+$\ln K_0$, $T_0$ in K, $\Delta H^\circ_0/R$ in K, $\Delta c^\circ_{p,0}/R$, $(\mathrm{d}\Delta c^\circ_p/\mathrm{d}T)/R$ in
+1/K) with the equilibrium constant in the molality scale (`solvent_molar_mass` in kg/mol, default water) and
+$\ln K(T)$ of Knopf et al. (2003, eq. 16); the amounts of a row are then the stoichiometric amounts. With reactions,
+`residual_heat_capacity_difference` is the equilibrium heat capacity (central difference in temperature, see
+`feos_core::ad::ElectrolyteProperties`).
 
 Parameters are given as `(name, indices)`:
 
@@ -62,11 +71,14 @@ Parameters are given as `(name, indices)`:
 |`m`, `sigma`, `epsilon_k`, `mu`, `q`|`[i]`|
 |`dipole_scaling`, `polarizability_scaling`, `correlation_integral_parameter`|`[i]`|
 |`k_ij`|`[i, j]`|
+|`ion_pairing`|`[i, j]` (cation and anion; variants `"bidh"`, `"bimsa"`)|
 |`born_delta_cation`, `born_delta_anion`|`[]`|
 
 All options of `EquationOfState.epcpsaft` can be passed, including `epcpsaft_variant` (`"dh"`: Debye-Hückel,
-`"msa"`: mean spherical approximation) and `msa_packing` (`"ions"`: packing term of the MSA over the ions only,
-`"total"`: over all species). Rows are evaluated in parallel. An example of a fit of ion parameters is given
+`"msa"`: mean spherical approximation, `"bidh"`: Debye-Hückel with ion pairing, `"bimsa"`: binding mean spherical
+approximation) and `msa_packing` (`"ions"`: packing term of the MSA/BiMSA over the ions only, `"total"`: over all
+species). Ion pairing (BiDH, BiMSA) of a cation i and an anion j uses the Bjerrum association constant multiplied by
+exp(`ion_pairing`) of the binary record of i and j (default 0). Rows are evaluated in parallel. An example of a fit of ion parameters is given
 in `examples/epcpsaft/parameter_adjustment`.
 
 ## Examples

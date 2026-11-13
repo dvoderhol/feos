@@ -213,21 +213,35 @@ impl CombiningRule<EPcpSaftRecord> for EPcpSaftAssociationRecord {
 pub struct EPcpSaftBinaryRecord {
     /// Binary dispersion interaction parameter
     pub k_ij: f64,
+    /// Ion pairing of a cation and an anion (variants BiDH and BiMSA): natural logarithm of the factor of the
+    /// Bjerrum association constant (0: Bjerrum constant)
+    #[serde(default)]
+    #[serde(skip_serializing_if = "f64::is_zero")]
+    pub ion_pairing: f64,
 }
 
 impl EPcpSaftBinaryRecord {
     pub fn new(k_ij: f64) -> Self {
-        Self { k_ij }
+        Self {
+            k_ij,
+            ion_pairing: 0.0,
+        }
     }
 }
 
 impl FromSegmentsBinary for EPcpSaftBinaryRecord {
     fn from_segments_binary(segments: &[(Self, f64, f64)]) -> FeosResult<Self> {
-        let (k_ij, n) = segments.iter().fold((0.0, 0.0), |(k_ij, n), (br, n1, n2)| {
-            let nab = n1 * n2;
-            (k_ij + br.k_ij * nab, n + nab)
-        });
-        Ok(Self { k_ij: k_ij / n })
+        let (k_ij, pairing, n) =
+            segments
+                .iter()
+                .fold((0.0, 0.0, 0.0), |(k_ij, f, n), (br, n1, n2)| {
+                    let nab = n1 * n2;
+                    (k_ij + br.k_ij * nab, f + br.ion_pairing * nab, n + nab)
+                });
+        Ok(Self {
+            k_ij: k_ij / n,
+            ion_pairing: pairing / n,
+        })
     }
 }
 
@@ -250,6 +264,8 @@ pub struct EPcpSaftPars<D = f64> {
     /// quadrupole moment in Debye Angstrom
     pub q: DVector<D>,
     pub k_ij: DMatrix<D>,
+    /// logarithm of the factor of the Bjerrum association constant of cation-anion pairs (BiDH, BiMSA)
+    pub ion_pairing: DMatrix<D>,
     /// (dipole_scaling, polarizability_scaling, correlation_integral_parameter) of all components;
     /// `None` if at least one component has no permittivity record.
     pub permittivity: Option<[DVector<D>; 3]>,
@@ -281,7 +297,7 @@ impl EPcpSaftPars {
         let [viscosity, thermal_conductivity] =
             parameters.collate(|pr| [pr.viscosity, pr.thermal_conductivity]);
         let [diffusion] = parameters.collate(|pr| [pr.diffusion]);
-        let [k_ij] = parameters.collate_binary(|br| [br.k_ij]);
+        let [k_ij, ion_pairing] = parameters.collate_binary(|br| [br.k_ij, br.ion_pairing]);
 
         // ions
         let ionic_comp: Vec<usize> = (0..n).filter(|&i| z[i] != 0.0).collect();
@@ -348,6 +364,7 @@ impl EPcpSaftPars {
             mu,
             q,
             k_ij,
+            ion_pairing,
             permittivity,
             [0.0, 0.0],
             Self {
@@ -357,6 +374,7 @@ impl EPcpSaftPars {
                 mu: DVector::zeros(0),
                 q: DVector::zeros(0),
                 k_ij: DMatrix::zeros(0, 0),
+                ion_pairing: DMatrix::zeros(0, 0),
                 permittivity: None,
                 born_delta: [0.0; 2],
                 mu2: DVector::zeros(0),
@@ -389,6 +407,7 @@ impl<D: DualNum<f64> + Copy> EPcpSaftPars<D> {
         mu: DVector<D>,
         q: DVector<D>,
         mut k_ij: DMatrix<D>,
+        ion_pairing: DMatrix<D>,
         permittivity: Option<[DVector<D>; 3]>,
         born_delta: [D; 2],
         structure: EPcpSaftPars<D0>,
@@ -429,6 +448,7 @@ impl<D: DualNum<f64> + Copy> EPcpSaftPars<D> {
             mu,
             q,
             k_ij,
+            ion_pairing,
             permittivity,
             born_delta,
             mu2,
@@ -459,6 +479,7 @@ impl<D: DualNum<f64> + Copy> EPcpSaftPars<D> {
             v(&self.mu),
             v(&self.q),
             self.k_ij.map(&f),
+            self.ion_pairing.map(&f),
             self.permittivity.as_ref().map(|p| p.each_ref().map(v)),
             self.born_delta.map(&f),
             self.clone(),
@@ -787,6 +808,50 @@ pub mod utils {
         serde_json::from_str(json).expect("Unable to parse json.")
     }
 
+    /// water, H+, SO4 2-, HSO4- (ion parameters for tests only)
+    pub fn water_sulfuric_acid_records()
+    -> Vec<PureRecord<EPcpSaftRecord, EPcpSaftAssociationRecord>> {
+        let json = r#"[
+            {
+                "identifier": {"name": "water", "cas": "7732-18-5"},
+                "molarweight": 18.011,
+                "m": 2.36948,
+                "sigma": 2.15072,
+                "epsilon_k": 230.71557,
+                "association_sites": [{"na": 1.0, "nb": 1.0, "kappa_ab": 0.35319, "epsilon_k_ab": 2195.10176}],
+                "permittivity_record": {"PerturbationTheory": {"dipole_scaling": 5.2607, "polarizability_scaling": 0.0, "correlation_integral_parameter": 0.1320}}
+            },
+            {
+                "identifier": {"name": "hydronium"},
+                "molarweight": 1.00794,
+                "m": 1.0,
+                "sigma": 3.4654,
+                "epsilon_k": 500.0,
+                "z": 1.0,
+                "permittivity_record": {"PerturbationTheory": {"dipole_scaling": 9.874, "polarizability_scaling": 0.0, "correlation_integral_parameter": 0.426}}
+            },
+            {
+                "identifier": {"name": "sulfate"},
+                "molarweight": 96.0626,
+                "m": 1.0,
+                "sigma": 2.6491,
+                "epsilon_k": 80.0,
+                "z": -2.0,
+                "permittivity_record": {"PerturbationTheory": {"dipole_scaling": 0.524, "polarizability_scaling": 0.0, "correlation_integral_parameter": 0.149}}
+            },
+            {
+                "identifier": {"name": "hydrogen-sulfate"},
+                "molarweight": 97.0705,
+                "m": 1.0,
+                "sigma": 3.2,
+                "epsilon_k": 150.0,
+                "z": -1.0,
+                "permittivity_record": {"PerturbationTheory": {"dipole_scaling": 2.0, "polarizability_scaling": 0.0, "correlation_integral_parameter": 0.15}}
+            }
+        ]"#;
+        serde_json::from_str(json).expect("Unable to parse json.")
+    }
+
     #[test]
     pub fn test_kij() -> FeosResult<()> {
         let ch3: String = "CH3".into();
@@ -807,7 +872,10 @@ pub mod utils {
                 BinarySegmentRecord::new(
                     id1.into(),
                     id2.into(),
-                    Some(EPcpSaftBinaryRecord { k_ij }),
+                    Some(EPcpSaftBinaryRecord {
+                        k_ij,
+                        ion_pairing: 0.0,
+                    }),
                 )
             })
             .collect();

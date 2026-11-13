@@ -6,6 +6,7 @@ use feos::epcpsaft::{
     EPcpSaft, EPcpSaftAD, EPcpSaftParameter, ElectrolyteDerivatives,
     electrolyte_properties_derivatives,
 };
+use feos_core::ad::ReactionEquilibrium;
 use nalgebra::DVector;
 use ndarray::{Array1, Array2, Array3};
 use numpy::{PyArray1, PyReadonlyArray2, ToPyArray};
@@ -40,6 +41,12 @@ fn parse_parameter(name: &str, index: &[usize]) -> PyResult<EPcpSaftParameter> {
                 "parameter `k_ij` needs two component indices",
             )),
         },
+        "ion_pairing" => match index {
+            [i, j] => Ok(IonPairing(*i, *j)),
+            _ => Err(PyValueError::new_err(
+                "parameter `ion_pairing` needs two component indices",
+            )),
+        },
         "born_delta_cation" if index.is_empty() => Ok(BornDeltaCation),
         "born_delta_anion" if index.is_empty() => Ok(BornDeltaAnion),
         _ => Err(PyValueError::new_err(format!(
@@ -55,12 +62,16 @@ type ElectrolyteResult<'py> = (
 );
 
 /// names of the scalar results of [ElectrolyteDerivatives]
-const SCALARS: [&str; 4] = [
+const SCALARS: [&str; 5] = [
     "ln_solvent_activity",
     "volume_difference",
     "residual_heat_capacity_difference",
     "residual_enthalpy_difference",
+    "relative_enthalpy",
 ];
+
+/// reaction as (stoichiometry, ln K0, T0 / K, Delta H0 / R / K, Delta c_p0 / R, (d Delta c_p / dT) / R / K^-1)
+type ReactionInput = (Vec<f64>, f64, f64, f64, f64, f64);
 
 #[pymethods]
 impl PyPropertyAD {
@@ -84,6 +95,15 @@ impl PyPropertyAD {
     ///     Every row must be electroneutral.
     /// solvent : int, optional
     ///     Index of the solvent. Defaults to 0.
+    /// reactions : list[tuple[list[float], float, float, float, float, float]], optional
+    ///     Reaction equilibria, each as (stoichiometric coefficients of all components, ln K0,
+    ///     T0 in K, standard reaction enthalpy at T0 divided by R in K, standard reaction heat
+    ///     capacity at T0 divided by R, its temperature derivative divided by R in 1/K); ln K in the
+    ///     molality scale (Knopf et al. 2003, eq. 16). The amounts of a row are then the
+    ///     stoichiometric amounts; all results refer to the equilibrium composition.
+    /// solvent_molar_mass : float, optional
+    ///     Molar mass of the solvent in kg/mol (molality scale of the equilibrium constants).
+    ///     Defaults to that of water.
     /// max_eta, max_iter_cross_assoc, tol_cross_assoc, dq_variant, epcpsaft_variant, msa_packing,
     /// born_delta_cation, born_delta_anion : optional
     ///     Options of the equation of state, see `EquationOfState.epcpsaft`.
@@ -93,13 +113,14 @@ impl PyPropertyAD {
     /// (dict[str, np.ndarray[float]], dict[str, np.ndarray[float]], np.ndarray[bool])
     ///     Values, derivatives and convergence status. Keys: ``ln_solvent_activity``,
     ///     ``volume_difference`` (volume of the solution minus volume of the pure solvent, m³),
-    ///     ``residual_heat_capacity_difference`` (J/K), ``residual_enthalpy_difference`` (J), all
-    ///     with shape ``[n]``, and ``ln_gamma`` with shape ``[n, n_components]`` (mole-fraction
-    ///     scale; solutes: infinite dilution in the pure solvent; solvent: pure solvent). The
+    ///     ``residual_heat_capacity_difference`` (J/K), ``residual_enthalpy_difference`` (J),
+    ///     ``relative_enthalpy`` (J), all with shape ``[n]``, ``ln_gamma`` with shape
+    ///     ``[n, n_components]`` (mole-fraction scale; solutes: infinite dilution in the pure
+    ///     solvent; solvent: pure solvent) and ``moles`` (equilibrium amounts, mol). The
     ///     derivatives have an additional last axis of length ``len(derivatives)``. Rows that did
     ///     not converge are NaN.
     #[staticmethod]
-    #[pyo3(signature = (parameters, derivatives, input, solvent=0, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", epcpsaft_variant="dh", msa_packing="ions", born_delta_cation=0.0, born_delta_anion=0.0))]
+    #[pyo3(signature = (parameters, derivatives, input, solvent=0, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", epcpsaft_variant="dh", msa_packing="ions", born_delta_cation=0.0, born_delta_anion=0.0, reactions=vec![], solvent_molar_mass=0.018015268))]
     #[expect(clippy::too_many_arguments)]
     pub fn electrolyte_properties_derivatives<'py>(
         py: Python<'py>,
@@ -115,6 +136,8 @@ impl PyPropertyAD {
         msa_packing: &str,
         born_delta_cation: f64,
         born_delta_anion: f64,
+        reactions: Vec<ReactionInput>,
+        solvent_molar_mass: f64,
     ) -> PyResult<ElectrolyteResult<'py>> {
         let options = epcpsaft_options(
             max_eta,
@@ -162,6 +185,34 @@ impl PyPropertyAD {
             }
         }
         let (n, np) = (input.nrows(), derivatives.len());
+        let reactions: Vec<ReactionEquilibrium> = reactions
+            .into_iter()
+            .map(|(nu, ln_k0, t0, dh0, dcp0, dcp_dt)| {
+                if nu.len() != nc {
+                    return Err(PyValueError::new_err(format!(
+                        "reaction needs {nc} stoichiometric coefficients, got {}",
+                        nu.len()
+                    )));
+                }
+                Ok(ReactionEquilibrium::new(
+                    DVector::from_vec(nu),
+                    ln_k0,
+                    t0,
+                    dh0,
+                    dcp0,
+                    dcp_dt,
+                ))
+            })
+            .collect::<PyResult<_>>()?;
+        for r in &reactions {
+            let charge: f64 = r.stoichiometry.iter().zip(&z).map(|(nu, z)| nu * z).sum();
+            if charge.abs() > 1e-12 || r.stoichiometry[solvent] != 0.0 {
+                return Err(PyValueError::new_err(format!(
+                    "reaction {:?} does not conserve charge or contains the solvent",
+                    r.stoichiometry.as_slice()
+                )));
+            }
+        }
 
         let row = |i: usize| {
             let r = input.row(i);
@@ -173,6 +224,8 @@ impl PyPropertyAD {
                 r[1] * PASCAL,
                 &moles,
                 solvent,
+                solvent_molar_mass,
+                &reactions,
             )
         };
         let results: Vec<_> = py.detach(|| {
@@ -183,10 +236,12 @@ impl PyPropertyAD {
             r
         });
 
-        let mut scalars = [(); 4].map(|_| Array1::from_elem(n, f64::NAN));
-        let mut scalar_grads = [(); 4].map(|_| Array2::from_elem((n, np), f64::NAN));
+        let mut scalars = [(); 5].map(|_| Array1::from_elem(n, f64::NAN));
+        let mut scalar_grads = [(); 5].map(|_| Array2::from_elem((n, np), f64::NAN));
         let mut ln_gamma = Array2::from_elem((n, nc), f64::NAN);
         let mut ln_gamma_grad = Array3::from_elem((n, nc, np), f64::NAN);
+        let mut moles = Array2::from_elem((n, nc), f64::NAN);
+        let mut moles_grad = Array3::from_elem((n, nc, np), f64::NAN);
         let mut status = Array1::from_elem(n, false);
         for (i, result) in results.into_iter().enumerate() {
             let Ok(e): Result<ElectrolyteDerivatives, _> = result else {
@@ -198,6 +253,7 @@ impl PyPropertyAD {
                 &e.volume_difference,
                 &e.residual_heat_capacity_difference,
                 &e.residual_enthalpy_difference,
+                &e.relative_enthalpy,
             ];
             for (q, vg) in s.iter().enumerate() {
                 scalars[q][i] = vg.value;
@@ -211,6 +267,12 @@ impl PyPropertyAD {
                     ln_gamma_grad[(i, c, k)] = vg.gradient[k];
                 }
             }
+            for (c, vg) in e.moles.iter().enumerate() {
+                moles[(i, c)] = vg.value;
+                for k in 0..np {
+                    moles_grad[(i, c, k)] = vg.gradient[k];
+                }
+            }
         }
         let values = PyDict::new(py);
         let gradients = PyDict::new(py);
@@ -220,6 +282,8 @@ impl PyPropertyAD {
         }
         values.set_item("ln_gamma", ln_gamma.to_pyarray(py))?;
         gradients.set_item("ln_gamma", ln_gamma_grad.to_pyarray(py))?;
+        values.set_item("moles", moles.to_pyarray(py))?;
+        gradients.set_item("moles", moles_grad.to_pyarray(py))?;
         Ok((values, gradients, status.to_pyarray(py)))
     }
 }
