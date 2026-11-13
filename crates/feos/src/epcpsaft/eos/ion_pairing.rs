@@ -60,6 +60,51 @@ pub fn bjerrum_constant<D: DualNum<f64> + Copy>(l: D, sigma: D) -> D {
     l.powi(3) * (bjerrum_primitive(b) - bjerrum_primitive(D::from(2.0))) * (4.0 * PI)
 }
 
+/// Ebeling association constant of an ion pair (Å³, per pair, number-density based; Ebeling, Z. Phys. Chem.
+/// (Leipzig) 238 (1968) 400):
+///
+/// K = 8π σ³ Σ_{m≥2} b^{2m} / ((2m)! (2m - 3)),   b = l / σ,
+///
+/// with l = |z_i z_j| λ_B (Å) and the distance of closest approach σ (Å). K is analytic in b (no cutoff), of order
+/// b⁴ for small b and equal to the Bjerrum constant to leading order for large b.
+pub fn ebeling_constant<D: DualNum<f64> + Copy>(l: D, sigma: D) -> D {
+    let b = l / sigma;
+    let b2 = b * b;
+    // term_m = b^{2m} / (2m)!
+    let mut term = b2 * b2 / 24.0;
+    let mut sum = term;
+    for m in 3..=EI_MAX_TERMS {
+        let k = (2 * m) as f64;
+        term = term * b2 / (k * (k - 1.0));
+        let add = term / (k - 3.0);
+        sum += add;
+        if add.re().abs() < 1e-17 * sum.re().abs() {
+            break;
+        }
+    }
+    sigma.powi(3) * sum * (8.0 * PI)
+}
+
+/// Association constant of an ion pair used by the ion-pairing variants.
+#[derive(Copy, Clone, PartialEq, Debug, Default)]
+pub enum PairingConstant {
+    /// Bjerrum constant ([bjerrum_constant]; zero for l / σ <= 2).
+    #[default]
+    Bjerrum,
+    /// Ebeling constant ([ebeling_constant]; analytic in l / σ).
+    Ebeling,
+}
+
+impl PairingConstant {
+    /// Association constant (Å³) for l = |z_i z_j| λ_B and the distance of closest approach σ.
+    pub fn constant<D: DualNum<f64> + Copy>(&self, l: D, sigma: D) -> D {
+        match self {
+            Self::Bjerrum => bjerrum_constant(l, sigma),
+            Self::Ebeling => ebeling_constant(l, sigma),
+        }
+    }
+}
+
 /// Fractions of non-paired ions X_i for the densities `rho` (Å⁻³) and association strengths `delta` (Å³).
 ///
 /// Successive substitution in f64 to convergence, then Newton steps in the number type D: the result has the
@@ -215,6 +260,34 @@ mod tests {
             let fd = (bjerrum_constant(l + h, sigma) - bjerrum_constant(l - h, sigma)) / (2.0 * h);
             assert_relative_eq!(d, fd, max_relative = 1e-6);
         }
+    }
+
+    /// Ebeling: series against a direct sum, smooth at l/σ = 2, equal to the Bjerrum constant for large l/σ.
+    #[test]
+    fn ebeling_constant_values() {
+        let direct = |b: f64| {
+            let mut s = 0.0;
+            let mut f = 24.0; // (2m)! for m = 2
+            for m in 2..80_i32 {
+                if m > 2 {
+                    f *= (2 * m) as f64 * (2 * m - 1) as f64;
+                }
+                s += b.powi(2 * m) / (f * (2 * m - 3) as f64);
+            }
+            8.0 * PI * s
+        };
+        for b in [1.0, 2.0, 3.0, 6.0] {
+            assert_relative_eq!(ebeling_constant(b, 1.0), direct(b), max_relative = 1e-12);
+        }
+        // derivative continuous at b = 2 (Bjerrum: jump from 0 to 4π l³ e²/16)
+        let d = |b: f64| first_derivative(|x: Dual64| ebeling_constant(x, Dual64::from(1.0)), b).1;
+        assert_relative_eq!(d(2.0 - 1e-6), d(2.0 + 1e-6), max_relative = 1e-5);
+        // large coupling: Ebeling -> Bjerrum
+        assert_relative_eq!(
+            ebeling_constant(20.0, 1.0),
+            bjerrum_constant(20.0, 1.0),
+            max_relative = 2e-4
+        );
     }
 
     #[test]

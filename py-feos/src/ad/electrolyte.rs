@@ -89,7 +89,7 @@ impl PyPropertyAD {
     ///     Parameters for which derivatives are calculated, e.g. ``("sigma", [1])``,
     ///     ``("k_ij", [0, 1])``, ``("born_delta_cation", [])``. Names: m, sigma, epsilon_k, mu, q,
     ///     dipole_scaling, polarizability_scaling, correlation_integral_parameter, k_ij,
-    ///     born_delta_cation, born_delta_anion.
+    ///     born_delta_cation, born_delta_anion, ion_pairing_constant.
     /// input : np.ndarray[float]
     ///     One row per state: temperature (K), pressure (Pa), amounts of all components (mol).
     ///     Every row must be electroneutral.
@@ -120,7 +120,7 @@ impl PyPropertyAD {
     ///     derivatives have an additional last axis of length ``len(derivatives)``. Rows that did
     ///     not converge are NaN.
     #[staticmethod]
-    #[pyo3(signature = (parameters, derivatives, input, solvent=0, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", epcpsaft_variant="dh", msa_packing="ions", born_delta_cation=0.0, born_delta_anion=0.0, reactions=vec![], solvent_molar_mass=0.018015268))]
+    #[pyo3(signature = (parameters, derivatives, input, solvent=0, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", epcpsaft_variant="dh", msa_packing="ions", born_delta_cation=0.0, born_delta_anion=0.0, ion_pairing_constant="bjerrum", reactions=vec![], solvent_molar_mass=0.018015268))]
     #[expect(clippy::too_many_arguments)]
     pub fn electrolyte_properties_derivatives<'py>(
         py: Python<'py>,
@@ -136,6 +136,7 @@ impl PyPropertyAD {
         msa_packing: &str,
         born_delta_cation: f64,
         born_delta_anion: f64,
+        ion_pairing_constant: &str,
         reactions: Vec<ReactionInput>,
         solvent_molar_mass: f64,
     ) -> PyResult<ElectrolyteResult<'py>> {
@@ -148,6 +149,7 @@ impl PyPropertyAD {
             msa_packing,
             born_delta_cation,
             born_delta_anion,
+            ion_pairing_constant,
         )?;
         let parameters = parameters.try_convert()?;
         let model =

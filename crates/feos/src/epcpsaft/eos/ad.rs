@@ -825,13 +825,28 @@ mod tests {
     /// parameters (screening parameter and fractions of non-paired ions solved inside).
     #[test]
     fn gradient_ion_pairing() -> FeosResult<()> {
-        for variant in [
-            super::super::EPcpSaftVariants::BiDH,
-            super::super::EPcpSaftVariants::BiMSA,
+        for (variant, constant) in [
+            (
+                super::super::EPcpSaftVariants::BiDH,
+                super::super::PairingConstant::Bjerrum,
+            ),
+            (
+                super::super::EPcpSaftVariants::BiMSA,
+                super::super::PairingConstant::Bjerrum,
+            ),
+            (
+                super::super::EPcpSaftVariants::BiDH,
+                super::super::PairingConstant::Ebeling,
+            ),
+            (
+                super::super::EPcpSaftVariants::BiMSA,
+                super::super::PairingConstant::Ebeling,
+            ),
         ] {
             let state = StateHD::new(310.0, 25.0, &dvector![0.9, 0.05, 0.05]);
             let options = super::super::EPcpSaftOptions {
                 epcpsaft_variant: variant,
+                ion_pairing_constant: constant,
                 born_delta_cation: 0.1,
                 ..Default::default()
             };

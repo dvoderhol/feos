@@ -77,8 +77,9 @@ Parameters are given as `(name, indices)`:
 All options of `EquationOfState.epcpsaft` can be passed, including `epcpsaft_variant` (`"dh"`: Debye-Hückel,
 `"msa"`: mean spherical approximation, `"bidh"`: Debye-Hückel with ion pairing, `"bimsa"`: binding mean spherical
 approximation) and `msa_packing` (`"ions"`: packing term of the MSA/BiMSA over the ions only, `"total"`: over all
-species). Ion pairing (BiDH, BiMSA) of a cation i and an anion j uses the Bjerrum association constant multiplied by
-exp(`ion_pairing`) of the binary record of i and j (default 0). Rows are evaluated in parallel. An example of a fit of ion parameters is given
+species). Ion pairing (BiDH, BiMSA) of a cation i and an anion j uses the Bjerrum (default) or Ebeling association constant multiplied by
+exp(`ion_pairing`) of the binary record of i and j (default 0); with `ion_pairing_constant="ebeling"` the Ebeling
+association constant (analytic in l_B |z_i z_j| / d_ij) replaces the Bjerrum constant. Rows are evaluated in parallel. An example of a fit of ion parameters is given
 in `examples/epcpsaft/parameter_adjustment`.
 
 ## Examples

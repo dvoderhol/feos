@@ -8,8 +8,8 @@
 //! with respect to the screening parameter Γ and the fractions X_i of non-paired ions:
 //! - A_MSA(Γ): functional of the unrestricted primitive MSA ([msa_functional]) of all ions (paired or not);
 //! - Δ_ij(Γ) = exp(f_ij) K_ij g_ij exp[-λ_B (X'_i X'_j - z_i z_j) / d_ij] for a cation i and an anion j (0 otherwise),
-//!   X'_i = (z_i - η(Γ) d_i²) / (1 + Γ d_i), d_ij = (d_i + d_j) / 2; K_ij Bjerrum association constant
-//!   ([bjerrum_constant]), f_ij logarithm of an adjustable factor (`ion_pairing`), g_ij contact value of the
+//!   X'_i = (z_i - η(Γ) d_i²) / (1 + Γ d_i), d_ij = (d_i + d_j) / 2; K_ij Bjerrum or Ebeling association constant
+//!   ([PairingConstant]), f_ij logarithm of an adjustable factor (`ion_pairing`), g_ij contact value of the
 //!   hard-sphere mixture of all species.
 //!
 //! ∂F/∂X_i = 0 is the mass action law X_i = 1 / (1 + Σ_j ρ_j X_j Δ_ij); at that solution the pairing part equals
@@ -17,7 +17,7 @@
 //! 4Γ²(1 + Γσ)² = κ² (α + Γσ) / (1 + Γσ) of Blum and Bernard with the fraction α of non-paired ions. The exponential
 //! factor of Δ is the electrostatic contact value of the pair normalized to 1 at infinite dilution. For ions of
 //! different size, η is that of the MSA functional (the Bernard-Blum closure uses a modified η).
-use super::ion_pairing::{bjerrum_constant, non_paired_fractions};
+use super::ion_pairing::{PairingConstant, non_paired_fractions};
 use super::msa::{eta, msa_functional, screening_parameter};
 use nalgebra::{DMatrix, DVector};
 use num_dual::{Dual, DualNum};
@@ -39,6 +39,8 @@ pub struct BiMsaInput<'a, D> {
     pub g: &'a DMatrix<D>,
     /// logarithms of the pairing factors
     pub f: &'a DMatrix<D>,
+    /// association constant (Bjerrum or Ebeling)
+    pub constant: PairingConstant,
 }
 
 impl<D: DualNum<f64> + Copy> BiMsaInput<'_, D> {
@@ -49,7 +51,7 @@ impl<D: DualNum<f64> + Copy> BiMsaInput<'_, D> {
             if self.z[i] * self.z[j] >= 0.0 {
                 return D::zero();
             }
-            let k = bjerrum_constant(
+            let k = self.constant.constant(
                 self.lb * (self.z[i] * self.z[j]).abs(),
                 (self.d[i] + self.d[j]) * 0.5,
             );
@@ -247,6 +249,7 @@ pub fn bimsa<D: DualNum<f64> + Copy>(input: &BiMsaInput<D>) -> (D, D, DVector<D>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::epcpsaft::eos::ion_pairing::bjerrum_constant;
     use approx::assert_relative_eq;
     use num_dual::Dual64;
     use std::f64::consts::{FRAC_PI_6, PI};
@@ -279,6 +282,7 @@ mod tests {
                 lb: self.lb,
                 g: &self.g,
                 f: &self.f,
+                constant: PairingConstant::Bjerrum,
             }
         }
     }
@@ -384,6 +388,7 @@ mod tests {
                 lb: Dual64::from(c.lb),
                 g: &g,
                 f: &f,
+                constant: PairingConstant::Bjerrum,
             };
             let (a, _, _) = bimsa(&input);
             let h = 1e-7 * c.rho[k];

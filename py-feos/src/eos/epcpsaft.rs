@@ -8,7 +8,9 @@ use crate::residual::ResidualModel;
 use crate::state::PyState;
 #[cfg(feature = "dft")]
 use feos::epcpsaft::EPcpSaftFunctional;
-use feos::epcpsaft::{DQVariants, EPcpSaft, EPcpSaftOptions, EPcpSaftVariants, MsaPacking};
+use feos::epcpsaft::{
+    DQVariants, EPcpSaft, EPcpSaftOptions, EPcpSaftVariants, MsaPacking, PairingConstant,
+};
 use feos_core::{EquationOfState, ReferenceSystem, ResidualDyn, StateHD};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -37,7 +39,17 @@ pub(crate) fn epcpsaft_options(
     msa_packing: &str,
     born_delta_cation: f64,
     born_delta_anion: f64,
+    ion_pairing_constant: &str,
 ) -> PyResult<EPcpSaftOptions> {
+    let ion_pairing_constant = match ion_pairing_constant {
+        "bjerrum" => PairingConstant::Bjerrum,
+        "ebeling" => PairingConstant::Ebeling,
+        _ => {
+            return Err(PyErr::new::<PyValueError, _>(
+                r#"ion_pairing_constant must be "bjerrum" or "ebeling""#,
+            ));
+        }
+    };
     let msa_packing = match msa_packing {
         "ions" => MsaPacking::Ions,
         "total" => MsaPacking::Total,
@@ -56,6 +68,7 @@ pub(crate) fn epcpsaft_options(
         msa_packing,
         born_delta_cation,
         born_delta_anion,
+        ion_pairing_constant,
     })
 }
 
@@ -99,6 +112,9 @@ impl PyEquationOfState {
     ///     Correction added to the diameter of all cations in the Born term (in Angstrom). Defaults to 0.
     /// born_delta_anion : float, optional
     ///     Correction added to the diameter of all anions in the Born term (in Angstrom). Defaults to 0.
+    /// ion_pairing_constant : "bjerrum" | "ebeling", optional
+    ///     Association constant of the ion pairs of the variants "bidh" and "bimsa": Bjerrum
+    ///     (zero below l_B |z_i z_j| / d_ij = 2) or Ebeling (analytic). Defaults to "bjerrum".
     ///
     /// Returns
     /// -------
@@ -107,8 +123,8 @@ impl PyEquationOfState {
     ///     states.
     #[staticmethod]
     #[pyo3(
-        signature = (parameters, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", epcpsaft_variant="dh", msa_packing="ions", born_delta_cation=0.0, born_delta_anion=0.0),
-        text_signature = r#"(parameters, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", epcpsaft_variant="dh", msa_packing="ions", born_delta_cation=0.0, born_delta_anion=0.0)"#
+        signature = (parameters, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", epcpsaft_variant="dh", msa_packing="ions", born_delta_cation=0.0, born_delta_anion=0.0, ion_pairing_constant="bjerrum"),
+        text_signature = r#"(parameters, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", epcpsaft_variant="dh", msa_packing="ions", born_delta_cation=0.0, born_delta_anion=0.0, ion_pairing_constant="bjerrum")"#
     )]
     #[expect(clippy::too_many_arguments)]
     pub fn epcpsaft(
@@ -121,6 +137,7 @@ impl PyEquationOfState {
         msa_packing: &str,
         born_delta_cation: f64,
         born_delta_anion: f64,
+        ion_pairing_constant: &str,
     ) -> PyResult<Self> {
         let options = epcpsaft_options(
             max_eta,
@@ -131,6 +148,7 @@ impl PyEquationOfState {
             msa_packing,
             born_delta_cation,
             born_delta_anion,
+            ion_pairing_constant,
         )?;
         let parameters = if let Ok(parameters) = parameters.extract::<PyParameters>() {
             parameters.try_convert()

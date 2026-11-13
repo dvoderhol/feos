@@ -183,8 +183,9 @@ class Model:
     """Target quantities of all points and their derivatives with respect to the parameter vector."""
 
     def __init__(self, parameters, points, variant="dh", msa_packing="ions", cp_model="ideal_gas",
-                 cp_electronic=False, reactions=()):
-        """variant: term for the ion-ion interactions, "dh" (Debye-Hückel) or "msa" (mean spherical approximation);
+                 cp_electronic=False, reactions=(), ion_pairing_constant="bjerrum"):
+        """variant: term for the ion-ion interactions, "dh" (Debye-Hückel), "msa" (mean spherical approximation),
+          "bidh" (Debye-Hückel with ion pairing) or "bimsa" (binding MSA);
         msa_packing: species in the packing term of the MSA, "ions" (primitive model) or "total" (all species);
         cp_model: apparent molar heat capacity = residual part of the model plus
           "ideal_gas": the ideal-gas heat capacities of the ions (ideal_gas_cp), no adjustable parameter;
@@ -193,13 +194,16 @@ class Model:
         cp_electronic: with cp_model "ideal_gas", include the electronic heat capacity of the ions (electronic_cp);
         reactions: reaction equilibria (e.g. REACTIONS) of the systems that contain all reactants or all products of a
           reaction (system_species); the compositions of the data are stoichiometric, every reactant that is the
-          only reactant of a reaction is replaced by its products in the amounts passed to feos (basis_moles)"""
+          only reactant of a reaction is replaced by its products in the amounts passed to feos (basis_moles);
+        ion_pairing_constant: association constant of the cation-anion pairs of "bidh" and "bimsa", "bjerrum" or
+          "ebeling"."""
         if cp_model not in ("ideal_gas", "offset", "residual"):
             raise ValueError(f"cp_model {cp_model!r}")
         self.par = parameters
         self.points = points
         self.variant = variant
         self.msa_packing = msa_packing
+        self.ion_pairing_constant = ion_pairing_constant
         self.cp_model = cp_model
         self.cp_electronic = cp_electronic
         self.reactions = tuple(reactions)
@@ -260,7 +264,8 @@ class Model:
             v, g, ok = feos.Property.electrolyte_properties_derivatives(
                 params, spec, np.array(rows), solvent=0, epcpsaft_variant=self.variant,
                 msa_packing=self.msa_packing, born_delta_cation=d_cat, born_delta_anion=d_an,
-                reactions=feos_reactions(ions, self.reactions), solvent_molar_mass=M_W)
+                reactions=feos_reactions(ions, self.reactions), solvent_molar_mass=M_W,
+                ion_pairing_constant=self.ion_pairing_constant)
             state = {o: (_row(v, j), _row(g, j) if jacobian else None, ok[j]) for j, o in enumerate(owner)}
             for k in idx:
                 pt = self.points[k]

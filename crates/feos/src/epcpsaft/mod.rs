@@ -13,7 +13,7 @@ pub use dft::{EPcpSaftFunctional, EPcpSaftFunctionalContribution};
 pub use eos::{
     DQVariants, ELECTROLYTE_GRADIENT_CHUNK, EPcpSaft, EPcpSaftAD, EPcpSaftBinary, EPcpSaftOptions,
     EPcpSaftParameter, EPcpSaftPure, EPcpSaftVariants, ElectrolyteDerivatives, MsaPacking,
-    ValueGradient, electrolyte_properties_derivatives,
+    PairingConstant, ValueGradient, electrolyte_properties_derivatives,
 };
 pub use parameters::EPcpSaftPars;
 pub use parameters::{

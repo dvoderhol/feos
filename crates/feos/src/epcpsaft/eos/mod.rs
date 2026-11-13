@@ -21,6 +21,7 @@ mod epcpsaft_binary;
 mod epcpsaft_pure;
 pub(crate) mod hard_chain;
 mod ion_pairing;
+pub use ion_pairing::PairingConstant;
 mod ionic;
 mod msa;
 pub(crate) mod permittivity;
@@ -70,6 +71,8 @@ pub struct EPcpSaftOptions {
     pub born_delta_cation: f64,
     /// Correction added to the diameter of all anions in the Born term (Angstrom)
     pub born_delta_anion: f64,
+    /// Association constant of the ion pairs (variants BiDH and BiMSA)
+    pub ion_pairing_constant: PairingConstant,
 }
 
 impl Default for EPcpSaftOptions {
@@ -83,6 +86,7 @@ impl Default for EPcpSaftOptions {
             msa_packing: MsaPacking::Ions,
             born_delta_cation: 0.0,
             born_delta_anion: 0.0,
+            ion_pairing_constant: PairingConstant::Bjerrum,
         }
     }
 }
@@ -207,7 +211,11 @@ impl EPcpSaft {
                 ),
                 EPcpSaftVariants::BiDH => {
                     let (rho, z, di, g, f) = ion_pair_input(p, state, &d);
-                    ("BiDH", bidh::bidh(&rho, &z, &di, &g, &f, bjerrum_length).0)
+                    let constant = self.options.ion_pairing_constant;
+                    (
+                        "BiDH",
+                        bidh::bidh(&rho, &z, &di, &g, &f, bjerrum_length, constant).0,
+                    )
                 }
                 EPcpSaftVariants::BiMSA => {
                     let (rho, z, di, g, f) = ion_pair_input(p, state, &d);
@@ -220,6 +228,7 @@ impl EPcpSaft {
                         lb: bjerrum_length,
                         g: &g,
                         f: &f,
+                        constant: self.options.ion_pairing_constant,
                     };
                     ("BiMSA", bimsa::bimsa(&input).0)
                 }
