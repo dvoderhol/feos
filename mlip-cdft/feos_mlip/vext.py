@@ -114,11 +114,12 @@ class VextResult:
     def vext(self, temperature):
         """Orientation-averaged V_ext / K (array n_a x n_b x n_c), inf where every orientation overlaps."""
         kt = KB_EV * temperature
-        with np.errstate(over="ignore", divide="ignore"):
-            umin = np.min(self.U, axis=1, keepdims=True)
+        with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
+            umin = np.nanmin(self.U, axis=1, keepdims=True)
             finite = np.isfinite(umin[:, 0])
             boltz = np.zeros(len(self.U))
-            boltz[finite] = np.mean(np.exp(-(self.U[finite] - umin[finite]) / kt), axis=1)
+            # nan marks orientations that are not part of a point's set (see refine_orientations)
+            boltz[finite] = np.nanmean(np.exp(-(self.U[finite] - umin[finite]) / kt), axis=1)
             v_irr = np.full(len(self.U), np.inf)
             v_irr[finite] = umin[finite, 0] - kt * np.log(boltz[finite])
         full = np.full(int(np.prod(self.n)), np.inf)
@@ -205,7 +206,9 @@ def interpolate_periodic(beta_v, n_fine, cap=50.0):
     The Boltzmann factor w = exp(-beta*V) (0 where V = inf) is interpolated linearly with periodic
     wrapping and converted back, beta*V = -ln w (>= cap -> cap). Interpolating w instead of beta*V keeps
     the steep framework cores from producing spurious wells (a cubic spline of the capped beta*V rings),
-    and linear interpolation keeps w positive, so the Boltzmann integral (Henry coefficient) is preserved.
+    and linear interpolation keeps w positive. The Boltzmann integral (Henry coefficient) is preserved only if the
+    fine grid is nested in the coarse one (n_fine = k * n_coarse): 0.4 -> 0.2 A keeps K_H to 0.03 %, while
+    0.4 -> 0.3 A (non-nested) changed it by -3.5 % for CO2 in Mg-MOF-74.
     """
     from scipy.interpolate import RegularGridInterpolator
 
@@ -219,3 +222,59 @@ def interpolate_periodic(beta_v, n_fine, cap=50.0):
     w_fine = interp(grid_points(n_fine).reshape(-1, 3)).reshape(tuple(n_fine))
     with np.errstate(divide="ignore"):
         return np.minimum(-np.log(w_fine), cap)
+
+
+def refine_orientations(result, engine, unit_cell, rotations, u_threshold=-0.15, ref_index=0, batch_size=64,
+                        r_atom_min=None, u_min=None):
+    """Re-evaluate the strongly attractive grid points with a denser orientation set.
+
+    The Boltzmann average is dominated by the deep wells, where the favourable orientations can occupy a
+    narrow window that a coarse orientation set misses. Points whose best insertion energy is below
+    `u_threshold` (eV) are recomputed with `rotations`; V_ext at those points then uses the dense set,
+    all other points keep the original set. Returns a new VextResult (U padded with inf; per-point means
+    use only the finite columns of the set that point was evaluated with)."""
+    info = result.info
+    r_atom_min = info.get("r_atom_min", 1.4) if r_atom_min is None else r_atom_min
+    u_min = info.get("u_min", -1.5) if u_min is None else u_min
+    best = np.min(result.U, axis=1)
+    sel = np.nonzero(best < u_threshold)[0]
+    frac = grid_points(result.n).reshape(-1, 3)[result.irr[sel]]
+    ref_cart = frac @ unit_cell.cell.array
+    gpos0 = engine.guest.positions - engine.guest.positions[ref_index]
+    U_new = np.full((len(sel), len(rotations)), np.inf)
+    configs = [(p, r) for p in range(len(sel)) for r in range(len(rotations))]
+    for s in range(0, len(configs), batch_size):
+        chunk = configs[s:s + batch_size]
+        pts = np.array([c[0] for c in chunk]); rots = np.array([c[1] for c in chunk])
+        g = np.einsum("bij,aj->bai", rotations[rots], gpos0) + ref_cart[pts][:, None, :]
+        u = engine.energies(g)
+        dmin = min_distance_to_host(g.reshape(-1, 3), engine.host).reshape(len(chunk), -1).min(1)
+        u[(dmin < r_atom_min) | (u < u_min)] = np.inf
+        U_new[pts, rots] = u
+    width = max(result.U.shape[1], len(rotations))
+    U = np.full((len(result.U), width), np.nan)          # nan = orientation not part of this point's set
+    U[:, :result.U.shape[1]] = result.U
+    U[sel] = np.nan
+    U[sel, :len(rotations)] = U_new
+    new = VextResult(result.n, result.cellpar, result.rep, result.irr, U, result.rotations,
+                     dict(info, refined_points=int(len(sel)), refined_orientations=int(len(rotations)),
+                          refine_threshold_eV=u_threshold))
+    return new
+
+
+def apply_overlap_guard(result, unit_cell, guest, host, r_atom_min, ref_index=0, chunk=2048):
+    """Discard stored insertion energies of orientations that place any guest atom closer than `r_atom_min`
+    to a framework atom (U -> inf), without new MLIP evaluations. Uses `result.rotations` (the base set;
+    re-run refine_orientations with the same r_atom_min for refined points)."""
+    U = np.array(result.U, dtype=float)
+    gpos0 = guest.positions - guest.positions[ref_index]
+    ref_cart = grid_points(result.n).reshape(-1, 3)[result.irr] @ unit_cell.cell.array
+    n_rot = len(result.rotations)
+    for s in range(0, len(ref_cart), chunk):
+        pts = ref_cart[s:s + chunk]
+        g = np.einsum("rij,aj->rai", result.rotations, gpos0)[None] + pts[:, None, None, :]   # (p, r, a, 3)
+        dmin = min_distance_to_host(g.reshape(-1, 3), host).reshape(len(pts), n_rot, -1).min(2)
+        block = U[s:s + chunk, :n_rot]
+        block[dmin < r_atom_min] = np.inf
+    info = dict(result.info, r_atom_min=r_atom_min)
+    return VextResult(result.n, result.cellpar, result.rep, result.irr, U, result.rotations, info)

@@ -26,8 +26,14 @@ def external_potential(vext_k):
     return v[None] * si.KB * si.KELVIN
 
 
-def pcsaft(components, parameter_file):
-    return feos.HelmholtzEnergyFunctional.pcsaft(feos.Parameters.from_json(components, parameter_file))
+def pcsaft(components, parameter_file, fmt_version=None):
+    """PC-SAFT functional. fmt_version: feos.FMTVersion (default WhiteBear). For strongly localised adsorbed
+    molecules (deep, narrow wells) AntiSymWhiteBear has the correct zero-dimensional (single-cavity) limit and
+    clamps |n2v| <= n2, which keeps FFT ringing of the weighted densities from breaking the solver."""
+    params = feos.Parameters.from_json(components, parameter_file)
+    if fmt_version is None:
+        return feos.HelmholtzEnergyFunctional.pcsaft(params)
+    return feos.HelmholtzEnergyFunctional.pcsaft(params, fmt_version=fmt_version)
 
 
 def henry_from_vext(vext_k, cellpar, temperature, framework_mass_amu):
@@ -164,3 +170,34 @@ def adaptive_isotherm(functional, pore, temperature_k, pressures_bar, solver=Non
             break
         out_p.append(p_t); out_n.append(float(pore.per_mass(prof.total_moles))); profiles.append(prof)
     return {"pressure_bar": np.array(out_p), "mol_per_kg": np.array(out_n), "profiles": profiles, "p_end": p_end}
+
+
+def canonical_isotherm(functional, pore, temperature_k, n_molecules, solver=None, density=None):
+    """Isotherm traced in the number of molecules N (feos PoreSpecification.Moles): for each N the
+    density profile is solved with the chemical potential as unknown; feos then updates the bulk state
+    in equilibrium with the pore, which gives p(N). Unlike pressure control this passes through
+    turning points of N(p), so a maximum in p(N) reveals a first-order transition of the cDFT model.
+
+    `n_molecules`: increasing numbers of molecules per cell (single component). Returns dict with
+    N per cell, pressure / bar, mol/kg and the profiles; stops at the first N that does not converge.
+    """
+    solver = solver or feos.DFTSolver().newton(max_iter=100)
+    NAV = 6.02214076e23
+    T = temperature_k * si.KELVIN
+    # start from a low-pressure grand-canonical profile
+    bulk = feos.State(functional, T, pressure=1e-4 * si.BAR, density_initialization="vapor")
+    prof = pore.initialize(bulk, density=density).solve(solver)
+    out_n, out_p, profiles, failed = [], [], [], None
+    for n in n_molecules:
+        spec = feos.PoreSpecification.Moles(np.array([n / NAV]) * si.MOL)
+        try:
+            prof = pore.initialize(prof.bulk, density=prof.density, specification=spec).solve(solver)
+        except Exception as e:  # noqa: BLE001
+            failed = (n, str(e)[:100])
+            break
+        out_n.append(float(prof.total_moles / si.MOL) * NAV)
+        out_p.append(float(prof.bulk.pressure() / si.BAR))
+        profiles.append(prof)
+    n_arr = np.array(out_n)
+    return {"molecules_per_cell": n_arr, "pressure_bar": np.array(out_p),
+            "mol_per_kg": n_arr / NAV / (pore.framework_mass_amu * AMU_KG), "profiles": profiles, "failed": failed}
