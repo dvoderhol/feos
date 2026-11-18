@@ -1,5 +1,6 @@
-//! ePCP-SAFT: PCP-SAFT with Debye-Hückel and Born contributions and the permittivity
-//! model of Rueben et al. (2024)
+//! ePCP-SAFT: PCP-SAFT with ion-ion contributions (Debye-Hückel, mean spherical approximation, or
+//! either with ion pairing: BiDH, BiMSA), a Born contribution and the permittivity model of
+//! Rueben et al. (2024)
 //!
 //! [Gross et al. (2001)](https://doi.org/10.1021/ie0003887)
 

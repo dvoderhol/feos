@@ -27,7 +27,9 @@ pub enum EPcpSaftParameter {
     CorrelationIntegralParameter(usize),
     BornDeltaCation,
     BornDeltaAnion,
-    /// logarithm of the factor of the Bjerrum association constant of a cation and an anion (BiDH, BiMSA)
+    /// correction of the ion diameter in the Debye-Hückel term
+    DhDelta,
+    /// logarithm of the factor of the association constant of a cation and an anion (BiDH, BiMSA)
     IonPairing(usize, usize),
 }
 
@@ -95,7 +97,7 @@ impl EPcpSaftAD<f64> {
                 | PolarizabilityScaling(i)
                 | CorrelationIntegralParameter(i) => Some(i),
                 KIJ(i, j) | IonPairing(i, j) => Some(i.max(j)),
-                BornDeltaCation | BornDeltaAnion => None,
+                BornDeltaCation | BornDeltaAnion | DhDelta => None,
             };
             if component.is_some_and(|i| i >= n) {
                 return error(format!("{parameter:?}: component index out of range"));
@@ -149,6 +151,7 @@ impl EPcpSaftAD<f64> {
                 }
                 BornDeltaCation => seed(&mut p.born_delta[0]),
                 BornDeltaAnion => seed(&mut p.born_delta[1]),
+                DhDelta => seed(&mut p.dh_delta),
                 IonPairing(i, j) => {
                     if p0.z[i] * p0.z[j] >= 0.0 {
                         return error(format!(
@@ -408,6 +411,7 @@ mod tests {
             CorrelationIntegralParameter(i) => p.permittivity.as_mut().unwrap()[2][i] += h,
             BornDeltaCation => p.born_delta[0] += h,
             BornDeltaAnion => p.born_delta[1] += h,
+            DhDelta => p.dh_delta += h,
             IonPairing(i, j) => {
                 p.ion_pairing[(i, j)] += h;
                 p.ion_pairing[(j, i)] += h
@@ -588,6 +592,7 @@ mod tests {
         let options = super::super::EPcpSaftOptions {
             born_delta_cation: 0.1,
             born_delta_anion: -0.05,
+            dh_delta: 0.2,
             epcpsaft_variant,
             msa_packing,
             ..Default::default()
@@ -611,6 +616,7 @@ mod tests {
             CorrelationIntegralParameter(2),
             BornDeltaCation,
             BornDeltaAnion,
+            DhDelta,
             Sigma(2),
             EpsilonK(1),
         ];
@@ -658,7 +664,7 @@ mod tests {
             Sigma(_) => 3.0,
             EpsilonK(_) => 200.0,
             DipoleScaling(_) => 5.0,
-            BornDeltaCation | BornDeltaAnion => 10.0,
+            BornDeltaCation | BornDeltaAnion | DhDelta => 10.0,
             _ => 1.0,
         };
         for (k, &parameter) in parameters.iter().enumerate() {
@@ -728,6 +734,7 @@ mod tests {
                 CorrelationIntegralParameter(i) => p.permittivity.as_mut().unwrap()[2][i] += h,
                 BornDeltaCation => p.born_delta[0] += h,
                 BornDeltaAnion => p.born_delta[1] += h,
+                DhDelta => p.dh_delta += h,
                 IonPairing(i, j) => {
                     p.ion_pairing[(i, j)] += h;
                     p.ion_pairing[(j, i)] += h

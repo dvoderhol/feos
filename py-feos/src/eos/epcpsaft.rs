@@ -39,6 +39,7 @@ pub(crate) fn epcpsaft_options(
     msa_packing: &str,
     born_delta_cation: f64,
     born_delta_anion: f64,
+    dh_delta: f64,
     ion_pairing_constant: &str,
 ) -> PyResult<EPcpSaftOptions> {
     let ion_pairing_constant = match ion_pairing_constant {
@@ -68,6 +69,7 @@ pub(crate) fn epcpsaft_options(
         msa_packing,
         born_delta_cation,
         born_delta_anion,
+        dh_delta,
         ion_pairing_constant,
     })
 }
@@ -84,8 +86,9 @@ fn dq_variant(dq_variant: &str) -> PyResult<DQVariants> {
 
 #[pymethods]
 impl PyEquationOfState {
-    /// ePCP-SAFT equation of state: PCP-SAFT with Debye-Hückel and Born contributions
-    /// and the permittivity model of Rueben et al. (2024).
+    /// ePCP-SAFT equation of state: PCP-SAFT with ion-ion contributions (Debye-Hückel, mean
+    /// spherical approximation, or either with ion pairing), a Born contribution and the
+    /// permittivity model of Rueben et al. (2024).
     ///
     /// Parameters
     /// ----------
@@ -103,8 +106,8 @@ impl PyEquationOfState {
     ///     Term for the electrostatic interactions between ions: Debye-Hückel ("dh"), mean
     ///     spherical approximation of the primitive model ("msa"), Debye-Hückel with ion pairing
     ///     ("bidh") or binding mean spherical approximation ("bimsa"). The ion pairing of a cation
-    ///     and an anion uses the Bjerrum association constant times exp(`ion_pairing`) of the
-    ///     binary record. Defaults to "dh".
+    ///     and an anion uses the association constant of `ion_pairing_constant` times
+    ///     exp(`ion_pairing`) of the binary record. Defaults to "dh".
     /// msa_packing : "ions" | "total", optional
     ///     Species in the packing term of the MSA and BiMSA: ions only (primitive model) or all
     ///     species (excluded volume of the solvent included). Defaults to "ions".
@@ -112,6 +115,9 @@ impl PyEquationOfState {
     ///     Correction added to the diameter of all cations in the Born term (in Angstrom). Defaults to 0.
     /// born_delta_anion : float, optional
     ///     Correction added to the diameter of all anions in the Born term (in Angstrom). Defaults to 0.
+    /// dh_delta : float, optional
+    ///     Correction added to the diameter of all ions in the Debye-Hückel term of the variant "dh"
+    ///     (in Angstrom). Defaults to 0.
     /// ion_pairing_constant : "bjerrum" | "ebeling", optional
     ///     Association constant of the ion pairs of the variants "bidh" and "bimsa": Bjerrum
     ///     (zero below l_B |z_i z_j| / d_ij = 2) or Ebeling (analytic). Defaults to "bjerrum".
@@ -123,8 +129,8 @@ impl PyEquationOfState {
     ///     states.
     #[staticmethod]
     #[pyo3(
-        signature = (parameters, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", epcpsaft_variant="dh", msa_packing="ions", born_delta_cation=0.0, born_delta_anion=0.0, ion_pairing_constant="bjerrum"),
-        text_signature = r#"(parameters, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", epcpsaft_variant="dh", msa_packing="ions", born_delta_cation=0.0, born_delta_anion=0.0, ion_pairing_constant="bjerrum")"#
+        signature = (parameters, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", epcpsaft_variant="dh", msa_packing="ions", born_delta_cation=0.0, born_delta_anion=0.0, dh_delta=0.0, ion_pairing_constant="bjerrum"),
+        text_signature = r#"(parameters, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", epcpsaft_variant="dh", msa_packing="ions", born_delta_cation=0.0, born_delta_anion=0.0, dh_delta=0.0, ion_pairing_constant="bjerrum")"#
     )]
     #[expect(clippy::too_many_arguments)]
     pub fn epcpsaft(
@@ -137,6 +143,7 @@ impl PyEquationOfState {
         msa_packing: &str,
         born_delta_cation: f64,
         born_delta_anion: f64,
+        dh_delta: f64,
         ion_pairing_constant: &str,
     ) -> PyResult<Self> {
         let options = epcpsaft_options(
@@ -148,6 +155,7 @@ impl PyEquationOfState {
             msa_packing,
             born_delta_cation,
             born_delta_anion,
+            dh_delta,
             ion_pairing_constant,
         )?;
         let parameters = if let Ok(parameters) = parameters.extract::<PyParameters>() {

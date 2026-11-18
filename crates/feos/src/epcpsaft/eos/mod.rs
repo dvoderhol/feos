@@ -65,12 +65,14 @@ pub struct EPcpSaftOptions {
     pub dq_variant: DQVariants,
     /// Term for the electrostatic interactions between ions
     pub epcpsaft_variant: EPcpSaftVariants,
-    /// Species in the packing term of the MSA (only for [EPcpSaftVariants::MeanSphericalApproximation])
+    /// Species in the packing term of the MSA (variants MSA and BiMSA)
     pub msa_packing: MsaPacking,
     /// Correction added to the diameter of all cations in the Born term (Angstrom)
     pub born_delta_cation: f64,
     /// Correction added to the diameter of all anions in the Born term (Angstrom)
     pub born_delta_anion: f64,
+    /// Correction added to the diameter of all ions in the Debye-Hückel term (variant DebyeHueckel; Angstrom)
+    pub dh_delta: f64,
     /// Association constant of the ion pairs (variants BiDH and BiMSA)
     pub ion_pairing_constant: PairingConstant,
 }
@@ -86,13 +88,15 @@ impl Default for EPcpSaftOptions {
             msa_packing: MsaPacking::Ions,
             born_delta_cation: 0.0,
             born_delta_anion: 0.0,
+            dh_delta: 0.0,
             ion_pairing_constant: PairingConstant::Bjerrum,
         }
     }
 }
 
-/// ePCP-SAFT equation of state: PCP-SAFT with Debye-Hückel and Born contributions
-/// and the permittivity model of Rueben et al. (2024).
+/// ePCP-SAFT equation of state: PCP-SAFT with ion-ion contributions (Debye-Hückel, mean
+/// spherical approximation, or either with ion pairing: BiDH, BiMSA), a Born contribution and
+/// the permittivity model of Rueben et al. (2024).
 pub struct EPcpSaft {
     pub parameters: EPcpSaftParameters,
     params: EPcpSaftPars,
@@ -116,6 +120,7 @@ impl EPcpSaft {
     ) -> FeosResult<Self> {
         let mut params = EPcpSaftPars::new(&parameters)?;
         params.born_delta = [options.born_delta_cation, options.born_delta_anion];
+        params.dh_delta = options.dh_delta;
         let hard_chain = params.m.iter().any(|m| (m - 1.0).abs() > 1e-15);
 
         let dipole = params.ndipole > 0;
@@ -198,7 +203,12 @@ impl EPcpSaft {
             v.push(match self.options.epcpsaft_variant {
                 EPcpSaftVariants::DebyeHueckel => (
                     "Ionic",
-                    Ionic.helmholtz_energy_density(p, state, &d, bjerrum_length),
+                    Ionic.helmholtz_energy_density(
+                        p,
+                        state,
+                        &p.dh_diameter(state.temperature),
+                        bjerrum_length,
+                    ),
                 ),
                 EPcpSaftVariants::MeanSphericalApproximation => (
                     "MSA",
@@ -277,6 +287,15 @@ impl<D: DualNum<f64> + Copy> EPcpSaftPars<D> {
             }
         }
         zeta
+    }
+
+    /// Debye-Hückel diameter: hard-sphere diameter plus dh_delta (all ions).
+    pub fn dh_diameter(&self, temperature: D) -> DVector<D> {
+        let mut d = self.diameter(temperature);
+        for &i in &self.ionic_comp {
+            d[i] += self.dh_delta;
+        }
+        d
     }
 
     /// Born diameter: hard-sphere diameter plus born_delta[0] (cations) or born_delta[1] (anions).

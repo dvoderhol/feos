@@ -214,7 +214,7 @@ pub struct EPcpSaftBinaryRecord {
     /// Binary dispersion interaction parameter
     pub k_ij: f64,
     /// Ion pairing of a cation and an anion (variants BiDH and BiMSA): natural logarithm of the factor of the
-    /// Bjerrum association constant (0: Bjerrum constant)
+    /// association constant (Bjerrum or Ebeling, option `ion_pairing_constant`; 0: the constant itself)
     #[serde(default)]
     #[serde(skip_serializing_if = "f64::is_zero")]
     pub ion_pairing: f64,
@@ -264,13 +264,15 @@ pub struct EPcpSaftPars<D = f64> {
     /// quadrupole moment in Debye Angstrom
     pub q: DVector<D>,
     pub k_ij: DMatrix<D>,
-    /// logarithm of the factor of the Bjerrum association constant of cation-anion pairs (BiDH, BiMSA)
+    /// logarithm of the factor of the association constant of cation-anion pairs (BiDH, BiMSA)
     pub ion_pairing: DMatrix<D>,
     /// (dipole_scaling, polarizability_scaling, correlation_integral_parameter) of all components;
     /// `None` if at least one component has no permittivity record.
     pub permittivity: Option<[DVector<D>; 3]>,
     /// correction of the Born diameter of all cations and all anions in Angstrom
     pub born_delta: [D; 2],
+    /// correction of the ion diameter in the Debye-Hückel term (all ions) in Angstrom
+    pub dh_delta: D,
     pub mu2: DVector<D>,
     pub q2: DVector<D>,
     pub sigma_ij: DMatrix<D>,
@@ -367,6 +369,7 @@ impl EPcpSaftPars {
             ion_pairing,
             permittivity,
             [0.0, 0.0],
+            0.0,
             Self {
                 m: DVector::zeros(0),
                 sigma: DVector::zeros(0),
@@ -377,6 +380,7 @@ impl EPcpSaftPars {
                 ion_pairing: DMatrix::zeros(0, 0),
                 permittivity: None,
                 born_delta: [0.0; 2],
+                dh_delta: 0.0,
                 mu2: DVector::zeros(0),
                 q2: DVector::zeros(0),
                 sigma_ij: DMatrix::zeros(0, 0),
@@ -410,6 +414,7 @@ impl<D: DualNum<f64> + Copy> EPcpSaftPars<D> {
         ion_pairing: DMatrix<D>,
         permittivity: Option<[DVector<D>; 3]>,
         born_delta: [D; 2],
+        dh_delta: D,
         structure: EPcpSaftPars<D0>,
     ) -> Self {
         let n = m.len();
@@ -451,6 +456,7 @@ impl<D: DualNum<f64> + Copy> EPcpSaftPars<D> {
             ion_pairing,
             permittivity,
             born_delta,
+            dh_delta,
             mu2,
             q2,
             sigma_ij,
@@ -482,6 +488,7 @@ impl<D: DualNum<f64> + Copy> EPcpSaftPars<D> {
             self.ion_pairing.map(&f),
             self.permittivity.as_ref().map(|p| p.each_ref().map(v)),
             self.born_delta.map(&f),
+            f(self.dh_delta),
             self.clone(),
         )
     }

@@ -49,6 +49,7 @@ fn parse_parameter(name: &str, index: &[usize]) -> PyResult<EPcpSaftParameter> {
         },
         "born_delta_cation" if index.is_empty() => Ok(BornDeltaCation),
         "born_delta_anion" if index.is_empty() => Ok(BornDeltaAnion),
+        "dh_delta" if index.is_empty() => Ok(DhDelta),
         _ => Err(PyValueError::new_err(format!(
             "unknown parameter `{name}` with indices {index:?}"
         ))),
@@ -89,7 +90,7 @@ impl PyPropertyAD {
     ///     Parameters for which derivatives are calculated, e.g. ``("sigma", [1])``,
     ///     ``("k_ij", [0, 1])``, ``("born_delta_cation", [])``. Names: m, sigma, epsilon_k, mu, q,
     ///     dipole_scaling, polarizability_scaling, correlation_integral_parameter, k_ij,
-    ///     born_delta_cation, born_delta_anion, ion_pairing_constant.
+    ///     born_delta_cation, born_delta_anion, dh_delta, ion_pairing (indices [cation, anion]).
     /// input : np.ndarray[float]
     ///     One row per state: temperature (K), pressure (Pa), amounts of all components (mol).
     ///     Every row must be electroneutral.
@@ -105,7 +106,7 @@ impl PyPropertyAD {
     ///     Molar mass of the solvent in kg/mol (molality scale of the equilibrium constants).
     ///     Defaults to that of water.
     /// max_eta, max_iter_cross_assoc, tol_cross_assoc, dq_variant, epcpsaft_variant, msa_packing,
-    /// born_delta_cation, born_delta_anion : optional
+    /// born_delta_cation, born_delta_anion, dh_delta, ion_pairing_constant : optional
     ///     Options of the equation of state, see `EquationOfState.epcpsaft`.
     ///
     /// Returns
@@ -120,7 +121,7 @@ impl PyPropertyAD {
     ///     derivatives have an additional last axis of length ``len(derivatives)``. Rows that did
     ///     not converge are NaN.
     #[staticmethod]
-    #[pyo3(signature = (parameters, derivatives, input, solvent=0, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", epcpsaft_variant="dh", msa_packing="ions", born_delta_cation=0.0, born_delta_anion=0.0, ion_pairing_constant="bjerrum", reactions=vec![], solvent_molar_mass=0.018015268))]
+    #[pyo3(signature = (parameters, derivatives, input, solvent=0, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", epcpsaft_variant="dh", msa_packing="ions", born_delta_cation=0.0, born_delta_anion=0.0, dh_delta=0.0, ion_pairing_constant="bjerrum", reactions=vec![], solvent_molar_mass=0.018015268))]
     #[expect(clippy::too_many_arguments)]
     pub fn electrolyte_properties_derivatives<'py>(
         py: Python<'py>,
@@ -136,6 +137,7 @@ impl PyPropertyAD {
         msa_packing: &str,
         born_delta_cation: f64,
         born_delta_anion: f64,
+        dh_delta: f64,
         ion_pairing_constant: &str,
         reactions: Vec<ReactionInput>,
         solvent_molar_mass: f64,
@@ -149,6 +151,7 @@ impl PyPropertyAD {
             msa_packing,
             born_delta_cation,
             born_delta_anion,
+            dh_delta,
             ion_pairing_constant,
         )?;
         let parameters = parameters.try_convert()?;
