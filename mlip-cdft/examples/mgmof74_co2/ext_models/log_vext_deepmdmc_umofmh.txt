@@ -1,0 +1,60 @@
+/local/home/dvoderhol/feos/mlip-cdft/feos_mlip/engine_nequip.py:105: UserWarning: host cell perpendicular widths [13.08 12.97 12.97] A < 26.3 A (receptive field 4 x 6.0 A + guest size): guest images can interact
+  warnings.warn(f"host cell perpendicular widths {np.round(widths, 2)} A < {need:.1f} A (receptive field "
+deepmdmc_umofmh: grid [18, 38, 38] (0.4 A), host 108 atoms, E_host -157425.08276 eV, E_guest -4375.72153 eV, energy_only True, image_ok False, dtype float64
+  128/335760 insertions, 81/s, eta 69.4 min
+  6528/335760 insertions, 503/s, eta 10.9 min
+  12928/335760 insertions, 555/s, eta 9.7 min
+  19328/335760 insertions, 571/s, eta 9.2 min
+  25728/335760 insertions, 581/s, eta 8.9 min
+  32128/335760 insertions, 587/s, eta 8.6 min
+  38528/335760 insertions, 592/s, eta 8.4 min
+  44928/335760 insertions, 594/s, eta 8.2 min
+  51328/335760 insertions, 594/s, eta 8.0 min
+  57728/335760 insertions, 595/s, eta 7.8 min
+  64128/335760 insertions, 595/s, eta 7.6 min
+  70528/335760 insertions, 597/s, eta 7.4 min
+  76928/335760 insertions, 598/s, eta 7.2 min
+  83328/335760 insertions, 598/s, eta 7.0 min
+  89728/335760 insertions, 598/s, eta 6.9 min
+  96128/335760 insertions, 598/s, eta 6.7 min
+  102528/335760 insertions, 598/s, eta 6.5 min
+  108928/335760 insertions, 599/s, eta 6.3 min
+  115328/335760 insertions, 599/s, eta 6.1 min
+  121728/335760 insertions, 599/s, eta 6.0 min
+  128128/335760 insertions, 599/s, eta 5.8 min
+  134528/335760 insertions, 599/s, eta 5.6 min
+  140928/335760 insertions, 599/s, eta 5.4 min
+  147328/335760 insertions, 600/s, eta 5.2 min
+  153728/335760 insertions, 600/s, eta 5.1 min
+  160128/335760 insertions, 600/s, eta 4.9 min
+  166528/335760 insertions, 600/s, eta 4.7 min
+  172928/335760 insertions, 600/s, eta 4.5 min
+  179328/335760 insertions, 600/s, eta 4.3 min
+  185728/335760 insertions, 601/s, eta 4.2 min
+  192128/335760 insertions, 601/s, eta 4.0 min
+  198528/335760 insertions, 601/s, eta 3.8 min
+  204928/335760 insertions, 601/s, eta 3.6 min
+  211328/335760 insertions, 601/s, eta 3.5 min
+  217728/335760 insertions, 601/s, eta 3.3 min
+  224128/335760 insertions, 601/s, eta 3.1 min
+  230528/335760 insertions, 601/s, eta 2.9 min
+  236928/335760 insertions, 601/s, eta 2.7 min
+  243328/335760 insertions, 601/s, eta 2.6 min
+  249728/335760 insertions, 601/s, eta 2.4 min
+  256128/335760 insertions, 601/s, eta 2.2 min
+  262528/335760 insertions, 601/s, eta 2.0 min
+  268928/335760 insertions, 602/s, eta 1.9 min
+  275328/335760 insertions, 601/s, eta 1.7 min
+  281728/335760 insertions, 601/s, eta 1.5 min
+  288128/335760 insertions, 601/s, eta 1.3 min
+  294528/335760 insertions, 601/s, eta 1.1 min
+  300928/335760 insertions, 602/s, eta 1.0 min
+  307328/335760 insertions, 602/s, eta 0.8 min
+  313728/335760 insertions, 602/s, eta 0.6 min
+  320128/335760 insertions, 602/s, eta 0.4 min
+  326528/335760 insertions, 602/s, eta 0.3 min
+  332928/335760 insertions, 602/s, eta 0.1 min
+  guard raw   : K_H 1.4767e-04 mol/(kg Pa), U_min -37.5 kJ/mol
+  guard paper : K_H 1.1553e-04 mol/(kg Pa), U_min -37.5 kJ/mol
+  guard u1.8  : K_H 1.4767e-04 mol/(kg Pa), U_min -37.5 kJ/mol
+  wall: base 561 s, total 628 s, refined points 208

@@ -1,0 +1,19 @@
+{
+ "spacing": 0.4,
+ "n_grid": [
+  18,
+  38,
+  38
+ ],
+ "K_H": 0.009634459613326036,
+ "K_H_base48": 0.00994708375395049,
+ "insertions_base": 335760,
+ "refined_points": 695,
+ "wall_setup_s": 12.1,
+ "wall_base_s": 627.3,
+ "wall_refine_s": 255.6,
+ "wall_total_s": 895.3,
+ "gpu": "NVIDIA GeForce RTX 3090",
+ "host": "mavt-epse-s103l.d.ethz.ch",
+ "gpu_processes": ""
+}

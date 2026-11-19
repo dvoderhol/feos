@@ -1,0 +1,98 @@
+{
+ "T_K": 298.0,
+ "key": "goeminne_pbed3",
+ "guard": "paper",
+ "fluid": "PC-SAFT m=1 (co2_pcsaft_m1.json)",
+ "fmt": "AntiSymWhiteBear",
+ "grid_feos": [
+  26,
+  26,
+  26
+ ],
+ "vext_info": {
+  "n_grid": 2197,
+  "n_irreducible": 2197,
+  "n_symmetry_ops": 1,
+  "n_evaluated_points": 1201,
+  "n_orientations": 48,
+  "n_insertions": 57648,
+  "n_below_u_min": 0,
+  "r_ref_min": 2.0,
+  "r_atom_min": 1.0,
+  "u_min": -1.5,
+  "E_host": 0.0013677881797775626,
+  "E_guest": -0.04632202163338661,
+  "wall_s": 164.9,
+  "refined_points": 28,
+  "refined_orientations": 192,
+  "refine_threshold_eV": -0.3,
+  "framework_mass_amu": 728.1240000000003,
+  "C_O": 1.160642995,
+  "model": "/local/home/dvoderhol/umof_models_ext/goeminne2023/data/training/model_MgMOF74_pbed3.pth",
+  "structure": "/local/home/dvoderhol/umof_models_ext/goeminne2023/structures/MgMOF74_goeminne_PBED3_framework.cif",
+  "host_rep": [
+   2,
+   2,
+   2
+  ],
+  "guest_types": [
+   "Co",
+   "Os",
+   "Os"
+  ],
+  "wall_base_s": 168.1,
+  "wall_total_s": 183.5,
+  "gpu": "NVIDIA GeForce RTX 3090",
+  "engine_info": {
+   "type_names": "H C O Mg Co Os",
+   "r_max": "5.0",
+   "num_layers": "",
+   "nequip_version": "0.5.3",
+   "default_dtype": "",
+   "energy_only_check_max_abs_eV": 7.450580596923828e-09
+  },
+  "pair_guard": {
+   "C": [
+    2.7,
+    2.52,
+    2.52
+   ],
+   "H": [
+    2.2,
+    2.02,
+    2.02
+   ],
+   "Mg": [
+    2.0,
+    1.8199999999999998,
+    1.8199999999999998
+   ],
+   "O": [
+    2.52,
+    2.34,
+    2.34
+   ]
+  }
+ },
+ "wall_s": 4.756408929824829,
+ "K_H": 0.00013355797844288197,
+ "pressure_bar": [
+  0.0001,
+  0.000890898718140339,
+  0.007937005259840991,
+  0.07071067811865475,
+  0.6299605249474363,
+  5.612310241546861,
+  50.0
+ ],
+ "mmol_per_g": [
+  0.0013359260377358829,
+  0.011926205598962169,
+  0.10823712918639192,
+  1.1600220066612086,
+  8.773668021448131,
+  17.501006419479296,
+  24.397611014016693
+ ],
+ "p_end": null
+}

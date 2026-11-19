@@ -97,3 +97,55 @@ unchanged. Use `pcsaft(..., fmt_version=feos.FMTVersion.AntiSymWhiteBear)` for a
   UFF): void fraction 0.737, 0.81 cm3/g; excess -> absolute adds 0.03 / 0.35 / 1.18 mmol/g at 1 / 10 / 30 bar.
 * uMOF-POLAR (own relaxed structure, same protocol): K_H 2.05e-3 vs 9.63e-3 (uMOF-MH) mol/(kg Pa); experimental
   initial slope 2.2e-3 (lower bound). final_isotherms_polar.py.
+
+## Framework flexibility: `feos_mlip/flex.py` (2026-11-17)
+
+Implements the notes "Harmonic approximation for framework flexibility in cDFT": harmonic empty framework (Hessian H
+of the MLIP host at R0, translations projected out), linear host-guest coupling f(x) = F_host(host + guest) - F_host(host)
+(`InsertionEngine.energies_forces`, one backward pass per batch), framework integrated out:
+delta(x) = -1/2 f^T H+ f (one-body, infinite dilution) and w(x, x') = -f^T H+ f' (basin mean field at finite loading,
+v_w = -f^T ubar_k, ubar_k = H+ (F_tot - F_k)), solved self-consistently around feos (`FlexibleMLIPPore3D.solve`:
+feos solves the PC-SAFT profile for V_eff, the outer loop updates ubar; damped Picard). Optional (A8) cumulant variant.
+
+* `HarmonicFramework`: H+ on the translation-free subspace; checks (A5) (acoustic sum rule, exactly 3 zero modes,
+  no negative eigenvalues). Mg-MOF-74 2x1x1 (uMOF-MH, float64): ASR 4e-15, lambda_min 0.059 eV/A^2.
+* Symmetry: inversion images reconstructed with the atom permutation, f(Ix)_perm(a) = -f(x)_a; the primitive-cell density
+  is replicated into the supercell copies. Verified: v_w equals the numerical functional derivative of F_w (rel. 1e-7..8e-5,
+  inverted and direct points).
+* Validation of delta against explicit framework relaxation at fixed guest (framework centroid fixed = subspace U):
+  ratio 0.99-1.07 at the Mg sites (max harmonic displacement u* < 0.1 A), 0.82-0.88 at u* ~ 0.16 A, but only 0.27-0.66
+  for u* > 0.3 A (soft modes; e.g. -0.33 vs -1.25 eV). Unfiltered, delta creates spurious wells (K_H x 1e11).
+  Therefore `FlexibleVext(..., u_cut=0.2)`: configurations with max|H+ f| > u_cut are treated rigidly (delta = 0, f = 0);
+  this underestimates their (real but smaller) relaxation. K_H(flex)/K_H(rigid) = 2.0 / 3.6 / 4.9 for u_cut 0.1/0.2/0.3 A.
+* Finite loading: the collective mean displacement max|<u>| exceeds the harmonic regime (0.56-0.70 A) above ~2e-3 bar;
+  results there are flagged invalid.
+* Linear coupling can only increase adsorption (delta <= 0); a decrease (stiffening, thermal fluctuation of the sites)
+  needs the quadratic coupling (notes, appendix).
+
+## Fluid-model test: cDFT + uMOF-MH with different PC-SAFT CO2 models (2026-11-18)
+
+`examples/mgmof74_co2/fluid_model_test.py <variant>` (same V_ext, grid, FMT and solver as `review_followup.py`):
+* `m1q`: m = 1, Q = 4.4 DA, refit to Span-Wagner (`parameters/fit_co2_m1_q.py` -> `co2_pcsaft_m1_q4.4.json`;
+  sigma 3.710 A, eps/k 197.4 K; AARD p_sat 4.7 %, rho_liq 1.2 % vs 8.4 % / 2.8 % for the m = 1, Q = 0 set).
+  V_ext enters exactly; the isotherm changes by <= 3 % (0.1-40 bar) from the baseline.
+* `g2005`: Gross 2005 quadrupolar CO2 (m = 1.513). feos' homosegmented Euler-Lagrange equation
+  ln rho = ln f - (dF_res/drho + beta V)/m together with the hard-chain term -(m-1) rho [ln(y lambda) - 1] gives the
+  dilute limit m ln g = -beta V + (m-1)[ln(g*w) + (g/(g*w))*w - 1] (w: delta shell of radius d): exact exp(-beta V)
+  for potentials slowly varying over d = 3.11 A, but narrow wells (the Mg sites) are smeared. Effective K_H 1.28e-3
+  instead of 9.63e-3 mol/(kg Pa) (independent FFT solution of the dilute-limit equation: 1.272e-3). The closer
+  agreement with experiment of this variant is therefore mainly a V_ext mapping artefact, not a fluid-fluid effect.
+* `g2005mV` (m V passed): INVALID, double counts V (dilute limit exp(-m beta V)); kept only as a record.
+
+## Published NequIP potentials in cDFT (2026-11-19): examples/mgmof74_co2/ext_models
+
+`feos_mlip/engine_nequip.py` (deployed NequIP TorchScript, energy-only path validated against the full model),
+`feos_mlip/vext.py: pair_thresholds_vdw, apply_pair_guard` (the papers' pairwise vdW overlap rules, post hoc).
+* Goeminne et al., JCTC 19, 6313 (2023), Zenodo 7904959: PBE-D3(BJ)/TS/MBD models on their 54-atom framework
+  (2x2x2 host, no symmetry: the framework is P1 within 0.3 A). Trained on intermolecular energies: the correct
+  V_ext is E(host+CO2) - E(host) ("paper+Eguest" files), see the note in engine_nequip.py. cDFT K_H 1.99e-3 /
+  2.15e-3 / 8.7e-3 mol/(kg Pa) vs the initial slopes of their own GCMC 1.72e-3 / 2.07e-3 / 7.2e-3 (raw uptake series
+  from Zenodo, goeminne_gcmc_reference.py). Grid V_ext vs random-insertion Widom (widom_check.py): 3.27e-4 vs
+  3.29e-4 +- 0.25e-4 (E_guest-subtracted D3).
+* Tayfuroglu & Keskin, JCP 163, 054704 (2025), github otayfuroglu/deepMDMC: fragment-trained (total energies), run on
+  OUR uMOF-MH structure (their rigid-GCMC structure is not published): K_H 1.16e-4 (their overlap rule), Widom
+  1.08e-4 +- 0.06e-4.

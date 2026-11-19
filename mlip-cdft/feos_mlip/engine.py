@@ -135,8 +135,47 @@ class InsertionEngine:
             self._templates[nb] = next(iter(loader)).to(self.device).to_dict()
         return self._templates[nb]
 
+    def set_host_positions(self, positions):
+        """Replace the host coordinates (same atoms, same cell), e.g. snapshots of a flexible framework.
+        Rebuilds the host-host edges and the empty-host reference energies (and forces, if used)."""
+        self.host.positions = np.asarray(positions, dtype=float)
+        self.host.wrap()
+        ei, sh, us, _ = mace_data.neighborhood.get_neighborhood(
+            self.host.positions, cutoff=self.r_max, pbc=(True, True, True), cell=self.cell)
+        self.hh = (torch.as_tensor(ei, device=self.device),
+                   torch.as_tensor(sh, device=self.device, dtype=self._tdtype),
+                   torch.as_tensor(us, device=self.device, dtype=self._tdtype))
+        self.host_pos_t = torch.as_tensor(self.host.positions, device=self.device, dtype=self._tdtype)
+        node_h, self.E_host, ok_h = self._reference_node_energies(self.host)
+        self.ref_nodes = torch.cat([node_h, self.ref_nodes[self.n_host:]])
+        self.use_node_energies = self.use_node_energies and ok_h
+        if hasattr(self, "host_forces"):
+            self.host_forces = self._reference_host_forces()
+
     def energies(self, guest_positions):
         """Insertion energies (eV, float64 numpy) for guest_positions of shape (B, n_guest, 3), Cartesian A."""
+        return self._evaluate(guest_positions, forces=False)
+
+    def energies_forces(self, guest_positions):
+        """Insertion energies (B,) and host coupling forces (B, n_host, 3), eV/A, float64 numpy.
+
+        The coupling force is f = F_host(host + guest) - F_host(host), i.e. f = -dU/dR_host with
+        U = E(host + guest) - E(host) - E(guest): the linear host-guest coupling of the harmonic framework
+        model (feos_mlip.flex). Subtracting the empty-host forces keeps f exact even if the host is not
+        perfectly relaxed. Needs one backward pass per batch (no second derivatives)."""
+        if not hasattr(self, "host_forces"):
+            self.host_forces = self._reference_host_forces()
+        u, f = self._evaluate(guest_positions, forces=True)
+        return u, f - self.host_forces[None]
+
+    def _reference_host_forces(self):
+        data = self._atomic_data(self.host.copy())
+        batch = next(iter(torch_geometric.dataloader.DataLoader([data], batch_size=1))).to(self.device)
+        with torch_tools.default_dtype(self.dtype), torch.enable_grad():
+            out = self.model(batch.to_dict(), compute_force=True, compute_stress=False, training=False)
+        return out["forces"].detach().double().cpu().numpy()
+
+    def _evaluate(self, guest_positions, forces=False):
         g = torch.as_tensor(np.asarray(guest_positions), device=self.device, dtype=self._tdtype)
         nb = g.shape[0]
         centroid = g.mean(1, keepdim=True)
@@ -164,8 +203,17 @@ class InsertionEngine:
         d = dict(self._template(nb))
         pos = torch.cat([self.host_pos_t[None].expand(nb, -1, -1), g], dim=1).reshape(-1, 3)
         d.update(positions=pos, edge_index=edge_index, shifts=shifts, unit_shifts=unit_shifts)
-        out = self._forward(d)
+        if forces:
+            with torch_tools.default_dtype(self.dtype), torch.enable_grad():
+                out = self.model(d, compute_force=True, compute_stress=False, training=False)
+        else:
+            out = self._forward(d)
         if self.use_node_energies:
-            node = out["node_energy"].double().reshape(nb, n)
-            return (node - self.ref_nodes[None]).sum(1).cpu().numpy()
-        return (out["energy"].double() - self.E_host - self.E_guest).cpu().numpy()
+            node = out["node_energy"].detach().double().reshape(nb, n)
+            u = (node - self.ref_nodes[None]).sum(1).cpu().numpy()
+        else:
+            u = (out["energy"].detach().double() - self.E_host - self.E_guest).cpu().numpy()
+        if not forces:
+            return u
+        f = out["forces"].detach().double().reshape(nb, n, 3)[:, :n_h].cpu().numpy()
+        return u, f

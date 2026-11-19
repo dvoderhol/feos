@@ -278,3 +278,47 @@ def apply_overlap_guard(result, unit_cell, guest, host, r_atom_min, ref_index=0,
         block[dmin < r_atom_min] = np.inf
     info = dict(result.info, r_atom_min=r_atom_min)
     return VextResult(result.n, result.cellpar, result.rep, result.irr, U, result.rotations, info)
+
+
+def pair_thresholds_vdw(guest_symbols, host, delta, overrides=None):
+    """Pairwise overlap distances (r_vdw(guest atom) - delta) + (r_vdw(host element) - delta) from ase.data.vdw_radii,
+    as used by Goeminne et al. 2023 (delta 0.35 A, Mg 1.0 A) and Tayfuroglu & Keskin 2025 (delta 0.2 A, Mg 1.25 A).
+    overrides: {element: radius} applied before subtracting delta. Returns {host element: array over guest atoms}."""
+    from ase.data import atomic_numbers, vdw_radii
+    r = {s: float(vdw_radii[atomic_numbers[s]]) for s in set(guest_symbols) | set(host.get_chemical_symbols())}
+    r.update(overrides or {})
+    return {e: np.array([(r[g] - delta) + (r[e] - delta) for g in guest_symbols])
+            for e in sorted(set(host.get_chemical_symbols()))}
+
+
+def apply_pair_guard(result, unit_cell, guest, host, thresholds, refined_rotations=None, ref_index=0, chunk=1024):
+    """Post-hoc overlap guard with element-pair distances: U -> inf for every stored orientation in which some guest atom
+    a is closer than thresholds[element][a] to a host atom of that element (minimum image). Rows refined by
+    refine_orientations (finite/inf beyond the base columns) use `refined_rotations`, all others result.rotations.
+    No MLIP evaluations. Returns a new VextResult."""
+    U = np.array(result.U, dtype=float)
+    gpos0 = guest.positions - guest.positions[ref_index]
+    ref_cart = grid_points(result.n).reshape(-1, 3)[result.irr] @ unit_cell.cell.array
+    n_base = len(result.rotations)
+    refined = np.zeros(len(U), bool)
+    if U.shape[1] > n_base:
+        refined = ~np.all(np.isnan(U[:, n_base:]), axis=1)
+    sym = np.array(host.get_chemical_symbols())
+    for rows, rots in [(np.nonzero(~refined)[0], result.rotations), (np.nonzero(refined)[0], refined_rotations)]:
+        if len(rows) == 0:
+            continue
+        if rots is None:
+            raise ValueError("refined rows present: pass refined_rotations")
+        for s in range(0, len(rows), chunk):
+            rr = rows[s:s + chunk]
+            g = np.einsum("rij,aj->rai", rots, gpos0)[None] + ref_cart[rr][:, None, None, :]   # (p, r, a, 3)
+            bad = np.zeros(g.shape[:2], bool)
+            for e, thr in thresholds.items():
+                sub = host[sym == e]
+                d = min_distance_to_host(g.reshape(-1, 3), sub).reshape(len(rr), len(rots), -1)  # (p, r, a)
+                bad |= np.any(d < thr[None, None, :], axis=2)
+            block = U[rr, :len(rots)]
+            block[bad] = np.inf
+            U[rr, :len(rots)] = block
+    info = dict(result.info, pair_guard={e: t.tolist() for e, t in thresholds.items()})
+    return VextResult(result.n, result.cellpar, result.rep, result.irr, U, result.rotations, info)
