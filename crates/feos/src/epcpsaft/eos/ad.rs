@@ -792,40 +792,47 @@ mod tests {
 
     #[test]
     fn gradient_electrolyte() -> FeosResult<()> {
-        let state = StateHD::new(310.0, 25.0, &dvector![0.9, 0.05, 0.05]);
-        let options = super::super::EPcpSaftOptions {
-            born_delta_cation: 0.1,
-            born_delta_anion: 0.05,
-            ..Default::default()
-        };
-        let binary = vec![
-            BinaryRecord::new(0, 1, Some(EPcpSaftBinaryRecord::new(0.01))),
-            BinaryRecord::new(1, 2, Some(EPcpSaftBinaryRecord::new(0.02))),
-        ];
-        let eos = EPcpSaft::with_options(
-            EPcpSaftParameters::new(water_nacl_records(), binary)?,
-            options,
-        )?;
-        check_gradient(
-            eos,
-            state,
-            [
-                Sigma(1),
-                Sigma(2),
-                EpsilonK(1),
-                M(0),
-                Sigma(0),
-                EpsilonK(0),
-                KIJ(0, 1),
-                KIJ(1, 2),
-                DipoleScaling(1),
-                PolarizabilityScaling(2),
-                CorrelationIntegralParameter(1),
-                DipoleScaling(0),
-                BornDeltaCation,
-                BornDeltaAnion,
-            ],
-        )
+        for born_diameter in [
+            super::super::BornDiameter::HardSphere,
+            super::super::BornDiameter::Sigma,
+        ] {
+            let state = StateHD::new(310.0, 25.0, &dvector![0.9, 0.05, 0.05]);
+            let options = super::super::EPcpSaftOptions {
+                born_delta_cation: 0.1,
+                born_delta_anion: 0.05,
+                born_diameter,
+                ..Default::default()
+            };
+            let binary = vec![
+                BinaryRecord::new(0, 1, Some(EPcpSaftBinaryRecord::new(0.01))),
+                BinaryRecord::new(1, 2, Some(EPcpSaftBinaryRecord::new(0.02))),
+            ];
+            let eos = EPcpSaft::with_options(
+                EPcpSaftParameters::new(water_nacl_records(), binary)?,
+                options,
+            )?;
+            check_gradient(
+                eos,
+                state,
+                [
+                    Sigma(1),
+                    Sigma(2),
+                    EpsilonK(1),
+                    M(0),
+                    Sigma(0),
+                    EpsilonK(0),
+                    KIJ(0, 1),
+                    KIJ(1, 2),
+                    DipoleScaling(1),
+                    PolarizabilityScaling(2),
+                    CorrelationIntegralParameter(1),
+                    DipoleScaling(0),
+                    BornDeltaCation,
+                    BornDeltaAnion,
+                ],
+            )?;
+        }
+        Ok(())
     }
 
     /// Derivatives of the ion-pairing variants (BiDH, BiMSA) with respect to the pairing parameter and the ion

@@ -273,6 +273,8 @@ pub struct EPcpSaftPars<D = f64> {
     pub born_delta: [D; 2],
     /// correction of the ion diameter in the Debye-Hückel term (all ions) in Angstrom
     pub dh_delta: D,
+    /// base of the Born diameter of the ions: `sigma` if true, hard-sphere diameter otherwise
+    pub born_sigma: bool,
     pub mu2: DVector<D>,
     pub q2: DVector<D>,
     pub sigma_ij: DMatrix<D>,
@@ -381,6 +383,7 @@ impl EPcpSaftPars {
                 permittivity: None,
                 born_delta: [0.0; 2],
                 dh_delta: 0.0,
+                born_sigma: false,
                 mu2: DVector::zeros(0),
                 q2: DVector::zeros(0),
                 sigma_ij: DMatrix::zeros(0, 0),
@@ -457,6 +460,7 @@ impl<D: DualNum<f64> + Copy> EPcpSaftPars<D> {
             permittivity,
             born_delta,
             dh_delta,
+            born_sigma: structure.born_sigma,
             mu2,
             q2,
             sigma_ij,

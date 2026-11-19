@@ -56,6 +56,15 @@ pub enum EPcpSaftVariants {
     BiMSA,
 }
 
+/// Base of the ion diameters in the Born term.
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub enum BornDiameter {
+    /// Hard-sphere diameter d_i = 0.88 σ_i (Held et al. 2014).
+    HardSphere,
+    /// Segment diameter σ_i (Bülow et al. 2021).
+    Sigma,
+}
+
 /// Customization options for the ePCP-SAFT equation of state and functional.
 #[derive(Copy, Clone)]
 pub struct EPcpSaftOptions {
@@ -71,6 +80,8 @@ pub struct EPcpSaftOptions {
     pub born_delta_cation: f64,
     /// Correction added to the diameter of all anions in the Born term (Angstrom)
     pub born_delta_anion: f64,
+    /// Base of the ion diameters in the Born term
+    pub born_diameter: BornDiameter,
     /// Correction added to the diameter of all ions in the Debye-Hückel term (variant DebyeHueckel; Angstrom)
     pub dh_delta: f64,
     /// Association constant of the ion pairs (variants BiDH and BiMSA)
@@ -88,6 +99,7 @@ impl Default for EPcpSaftOptions {
             msa_packing: MsaPacking::Ions,
             born_delta_cation: 0.0,
             born_delta_anion: 0.0,
+            born_diameter: BornDiameter::HardSphere,
             dh_delta: 0.0,
             ion_pairing_constant: PairingConstant::Bjerrum,
         }
@@ -121,6 +133,7 @@ impl EPcpSaft {
         let mut params = EPcpSaftPars::new(&parameters)?;
         params.born_delta = [options.born_delta_cation, options.born_delta_anion];
         params.dh_delta = options.dh_delta;
+        params.born_sigma = options.born_diameter == BornDiameter::Sigma;
         let hard_chain = params.m.iter().any(|m| (m - 1.0).abs() > 1e-15);
 
         let dipole = params.ndipole > 0;
@@ -155,8 +168,8 @@ impl EPcpSaft {
         self.params.map(D::from).permittivity(state)
     }
 
-    /// Diameters used in the Born term: hard-sphere diameter plus `born_delta_cation`
-    /// (cations) or `born_delta_anion` (anions).
+    /// Diameters used in the Born term: hard-sphere diameter (or σ, option `born_diameter`) plus
+    /// `born_delta_cation` (cations) or `born_delta_anion` (anions).
     pub fn born_diameter<D: DualNum<f64> + Copy>(&self, temperature: D) -> DVector<D> {
         self.params.map(D::from).born_diameter(temperature)
     }
@@ -298,10 +311,14 @@ impl<D: DualNum<f64> + Copy> EPcpSaftPars<D> {
         d
     }
 
-    /// Born diameter: hard-sphere diameter plus born_delta[0] (cations) or born_delta[1] (anions).
+    /// Born diameter: hard-sphere diameter (or sigma if `born_sigma`) plus born_delta[0]
+    /// (cations) or born_delta[1] (anions).
     pub fn born_diameter(&self, temperature: D) -> DVector<D> {
         let mut d = self.diameter(temperature);
         for &i in &self.ionic_comp {
+            if self.born_sigma {
+                d[i] = self.sigma[i];
+            }
             d[i] += if self.z[i] > 0.0 {
                 self.born_delta[0]
             } else {
@@ -1588,6 +1605,17 @@ mod tests_electrolyte {
         assert_eq!(db[0], d[0]);
         assert_eq!(db[1], d[1] + 0.3);
         assert_eq!(db[2], d[2] - 0.1);
+        let options = EPcpSaftOptions {
+            born_delta_cation: 0.3,
+            born_delta_anion: -0.1,
+            born_diameter: BornDiameter::Sigma,
+            ..Default::default()
+        };
+        let eos_sigma = EPcpSaft::with_options(water_nacl_parameters(), options)?;
+        let db = eos_sigma.born_diameter(298.15);
+        assert_eq!(db[0], d[0]);
+        assert_eq!(db[1], p.sigma[1] + 0.3);
+        assert_eq!(db[2], p.sigma[2] - 0.1);
         Ok(())
     }
 

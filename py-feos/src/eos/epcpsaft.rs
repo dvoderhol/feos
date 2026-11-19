@@ -9,7 +9,8 @@ use crate::state::PyState;
 #[cfg(feature = "dft")]
 use feos::epcpsaft::EPcpSaftFunctional;
 use feos::epcpsaft::{
-    DQVariants, EPcpSaft, EPcpSaftOptions, EPcpSaftVariants, MsaPacking, PairingConstant,
+    BornDiameter, DQVariants, EPcpSaft, EPcpSaftOptions, EPcpSaftVariants, MsaPacking,
+    PairingConstant,
 };
 use feos_core::{EquationOfState, ReferenceSystem, ResidualDyn, StateHD};
 use pyo3::exceptions::PyValueError;
@@ -39,9 +40,19 @@ pub(crate) fn epcpsaft_options(
     msa_packing: &str,
     born_delta_cation: f64,
     born_delta_anion: f64,
+    born_diameter: &str,
     dh_delta: f64,
     ion_pairing_constant: &str,
 ) -> PyResult<EPcpSaftOptions> {
+    let born_diameter = match born_diameter {
+        "hs" => BornDiameter::HardSphere,
+        "sigma" => BornDiameter::Sigma,
+        _ => {
+            return Err(PyErr::new::<PyValueError, _>(
+                r#"born_diameter must be "hs" or "sigma""#,
+            ));
+        }
+    };
     let ion_pairing_constant = match ion_pairing_constant {
         "bjerrum" => PairingConstant::Bjerrum,
         "ebeling" => PairingConstant::Ebeling,
@@ -69,6 +80,7 @@ pub(crate) fn epcpsaft_options(
         msa_packing,
         born_delta_cation,
         born_delta_anion,
+        born_diameter,
         dh_delta,
         ion_pairing_constant,
     })
@@ -115,6 +127,9 @@ impl PyEquationOfState {
     ///     Correction added to the diameter of all cations in the Born term (in Angstrom). Defaults to 0.
     /// born_delta_anion : float, optional
     ///     Correction added to the diameter of all anions in the Born term (in Angstrom). Defaults to 0.
+    /// born_diameter : "hs" | "sigma", optional
+    ///     Base of the ion diameters in the Born term: hard-sphere diameter 0.88 σ_i ("hs"; Held et
+    ///     al. 2014) or σ_i ("sigma"; Bülow et al. 2021). Defaults to "hs".
     /// dh_delta : float, optional
     ///     Correction added to the diameter of all ions in the Debye-Hückel term of the variant "dh"
     ///     (in Angstrom). Defaults to 0.
@@ -129,8 +144,8 @@ impl PyEquationOfState {
     ///     states.
     #[staticmethod]
     #[pyo3(
-        signature = (parameters, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", epcpsaft_variant="dh", msa_packing="ions", born_delta_cation=0.0, born_delta_anion=0.0, dh_delta=0.0, ion_pairing_constant="bjerrum"),
-        text_signature = r#"(parameters, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", epcpsaft_variant="dh", msa_packing="ions", born_delta_cation=0.0, born_delta_anion=0.0, dh_delta=0.0, ion_pairing_constant="bjerrum")"#
+        signature = (parameters, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", epcpsaft_variant="dh", msa_packing="ions", born_delta_cation=0.0, born_delta_anion=0.0, born_diameter="hs", dh_delta=0.0, ion_pairing_constant="bjerrum"),
+        text_signature = r#"(parameters, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", epcpsaft_variant="dh", msa_packing="ions", born_delta_cation=0.0, born_delta_anion=0.0, born_diameter="hs", dh_delta=0.0, ion_pairing_constant="bjerrum")"#
     )]
     #[expect(clippy::too_many_arguments)]
     pub fn epcpsaft(
@@ -143,6 +158,7 @@ impl PyEquationOfState {
         msa_packing: &str,
         born_delta_cation: f64,
         born_delta_anion: f64,
+        born_diameter: &str,
         dh_delta: f64,
         ion_pairing_constant: &str,
     ) -> PyResult<Self> {
@@ -155,6 +171,7 @@ impl PyEquationOfState {
             msa_packing,
             born_delta_cation,
             born_delta_anion,
+            born_diameter,
             dh_delta,
             ion_pairing_constant,
         )?;
