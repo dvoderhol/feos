@@ -61,7 +61,7 @@ impl EPcpSaftAD<f64> {
     pub fn derivatives<const P: usize>(
         &self,
         parameters: [EPcpSaftParameter; P],
-    ) -> FeosResult<EPcpSaftAD<DualSVec<f64, f64, P>>> {
+    ) -> FeosResult<EPcpSaftAD<DualSVec<f64, P>>> {
         self.derivatives_partial(&parameters)
     }
 
@@ -70,7 +70,7 @@ impl EPcpSaftAD<f64> {
     pub fn derivatives_partial<const P: usize>(
         &self,
         parameters: &[EPcpSaftParameter],
-    ) -> FeosResult<EPcpSaftAD<DualSVec<f64, f64, P>>> {
+    ) -> FeosResult<EPcpSaftAD<DualSVec<f64, P>>> {
         use EPcpSaftParameter::*;
         if parameters.len() > P {
             return Err(FeosError::IncompatibleParameters(format!(
@@ -84,7 +84,7 @@ impl EPcpSaftAD<f64> {
         let error = |msg: String| Err(FeosError::IncompatibleParameters(msg));
         check_duplicates(parameters)?;
         for (k, &parameter) in parameters.iter().enumerate() {
-            let seed = |x: &mut DualSVec<f64, f64, P>| {
+            let seed = |x: &mut DualSVec<f64, P>| {
                 x.eps = Derivative::derivative_generic(Const::<P>, U1, k)
             };
             let component = match parameter {
@@ -172,13 +172,13 @@ impl EPcpSaftAD<f64> {
     }
 }
 
-impl<D: DualNum<f64> + Copy> Residual<Dyn, D> for EPcpSaftAD<D> {
+impl<D: DualNum<Primitive = f64> + Copy> Residual<Dyn, D> for EPcpSaftAD<D> {
     fn components(&self) -> usize {
         self.params.m.len()
     }
 
     type Real = EPcpSaftAD<f64>;
-    type Lifted<D2: DualNum<f64, Inner = D> + Copy> = EPcpSaftAD<D2>;
+    type Lifted<D2: DualNum<Primitive = f64, Inner = D> + Copy> = EPcpSaftAD<D2>;
 
     fn re(&self) -> Self::Real {
         EPcpSaftAD {
@@ -188,7 +188,7 @@ impl<D: DualNum<f64> + Copy> Residual<Dyn, D> for EPcpSaftAD<D> {
         }
     }
 
-    fn lift<D2: DualNum<f64, Inner = D> + Copy>(&self) -> Self::Lifted<D2> {
+    fn lift<D2: DualNum<Primitive = f64, Inner = D> + Copy>(&self) -> Self::Lifted<D2> {
         EPcpSaftAD {
             model: self.model.clone(),
             params: self.params.map(|x| D2::from_inner(&x)),
@@ -202,12 +202,9 @@ impl<D: DualNum<f64> + Copy> Residual<Dyn, D> for EPcpSaftAD<D> {
         (msigma3.dot(molefracs) * FRAC_PI_6).recip() * self.model.options.max_eta
     }
 
-    fn reduced_helmholtz_energy_density_contributions(
-        &self,
-        state: &StateHD<D>,
-    ) -> Vec<(&'static str, D)> {
+    fn for_each_contribution(&self, state: &StateHD<D>, f: impl FnMut(&'static str, D)) {
         self.model
-            .contributions(&self.params, state, self.hard_chain)
+            .for_each_contribution_with(&self.params, state, self.hard_chain, f)
     }
 }
 
@@ -341,7 +338,7 @@ pub fn electrolyte_properties_derivatives(
             residual_enthalpy_difference: new(values[3].re),
             relative_enthalpy: new(values[4].re),
         });
-        let set = |target: &mut ValueGradient, x: &DualSVec<f64, f64, P>| {
+        let set = |target: &mut ValueGradient, x: &DualSVec<f64, P>| {
             let eps = x.eps.unwrap_generic(Const::<P>, U1);
             for k in 0..chunk.len() {
                 target.gradient[offset + k] = eps[k];
@@ -741,10 +738,9 @@ mod tests {
                 }
             }
             let p = p.map(|x| x);
-            eos.contributions(&p, state, true)
-                .iter()
-                .map(|(_, a)| a)
-                .sum::<f64>()
+            let mut sum = 0.0;
+            eos.for_each_contribution_with(&p, state, true, |_, a| sum += a);
+            sum
         };
         (a(h) - a(-h)) / (2.0 * h)
     }
@@ -758,10 +754,11 @@ mod tests {
         let ad = EPcpSaftAD::new(eos.clone()).derivatives(parameters)?;
         let s = StateHD::new_density(
             DualSVec::from(state.temperature),
-            &state.partial_density.map(DualSVec::from),
+            state.partial_density.map(DualSVec::from),
         );
         let a = ad.reduced_residual_helmholtz_energy_density(&s);
-        let a_f64 = ResidualDyn::reduced_helmholtz_energy_density_contributions(&*eos, &state)
+        let a_f64 = (&*eos)
+            .reduced_helmholtz_energy_density_contributions(&state)
             .iter()
             .map(|(_, a)| a)
             .sum::<f64>();
@@ -784,7 +781,7 @@ mod tests {
             let ad = EPcpSaftAD::new(eos.clone());
             assert_eq!(
                 ad.reduced_helmholtz_energy_density_contributions(&state),
-                ResidualDyn::reduced_helmholtz_energy_density_contributions(&*eos, &state)
+                (&*eos).reduced_helmholtz_energy_density_contributions(&state)
             );
         }
         Ok(())

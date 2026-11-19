@@ -1,6 +1,6 @@
 use super::eos::GcPcSaftOptions;
 use super::record::GcPcSaftAssociationRecord;
-use crate::association::{Association, AssociationStrength, YuWuAssociationFunctional};
+use crate::association::{AssociationStrength, AssociationVersion, SaftAssociationFunctional};
 use crate::gc_pcsaft::GcPcSaftParameters;
 use crate::hard_sphere::{FMTContribution, FMTVersion, HardSphereProperties, MonomerShape};
 use feos_core::{FeosResult, Molarweight, ResidualDyn, StateHD, Subset};
@@ -27,9 +27,9 @@ pub use parameter::GcPcSaftFunctionalParameters;
 pub struct GcPcSaftFunctional {
     parameters: GcPcSaftParameters<()>,
     params: GcPcSaftFunctionalParameters,
-    association: Option<Association>,
     fmt_version: FMTVersion,
     options: GcPcSaftOptions,
+    association_version: AssociationVersion,
 }
 
 impl GcPcSaftFunctional {
@@ -37,6 +37,7 @@ impl GcPcSaftFunctional {
         Self::with_options(
             parameters,
             FMTVersion::WhiteBear,
+            AssociationVersion::ISaft,
             GcPcSaftOptions::default(),
         )
     }
@@ -44,21 +45,16 @@ impl GcPcSaftFunctional {
     pub fn with_options(
         parameters: GcPcSaftParameters<()>,
         fmt_version: FMTVersion,
+        association_version: AssociationVersion,
         saft_options: GcPcSaftOptions,
     ) -> Self {
         let params = GcPcSaftFunctionalParameters::new(&parameters);
-        let association = (!parameters.association.is_empty()).then(|| {
-            Association::new(
-                saft_options.max_iter_cross_assoc,
-                saft_options.tol_cross_assoc,
-            )
-        });
         Self {
             parameters,
             params,
-            association,
             fmt_version,
             options: saft_options,
+            association_version,
         }
     }
 }
@@ -68,6 +64,7 @@ impl Subset for GcPcSaftFunctional {
         Self::with_options(
             self.parameters.subset(component_list),
             self.fmt_version,
+            self.association_version,
             self.options,
         )
     }
@@ -78,7 +75,7 @@ impl ResidualDyn for GcPcSaftFunctional {
         self.parameters.molar_weight.len()
     }
 
-    fn compute_max_density<D: DualNum<f64> + Copy>(&self, molefracs: &DVector<D>) -> D {
+    fn compute_max_density<D: DualNum<Primitive = f64> + Copy>(&self, molefracs: &DVector<D>) -> D {
         let p = &self.params;
         let msigma3 = p.m.zip_map(&p.sigma, |m, s| m * s.powi(3) * m);
         let molefracs_segments: DVector<_> = p
@@ -90,16 +87,18 @@ impl ResidualDyn for GcPcSaftFunctional {
         (msigma3.map(D::from).dot(&molefracs_segments) * FRAC_PI_6).recip() * self.options.max_eta
     }
 
-    fn reduced_helmholtz_energy_density_contributions<D: DualNum<f64> + Copy>(
+    fn for_each_contribution<D: DualNum<Primitive = f64> + Copy>(
         &self,
         state: &StateHD<D>,
-    ) -> Vec<(&'static str, D)> {
-        self.evaluate_bulk(state)
+        f: impl FnMut(&'static str, D),
+    ) {
+        self.evaluate_bulk(state, f)
     }
 }
 
 impl HelmholtzEnergyFunctionalDyn for GcPcSaftFunctional {
     type Contribution<'a> = GcPcSaftFunctionalContribution<'a>;
+    type Association<'a> = SaftAssociationFunctional<'a, GcPcSaftFunctionalParameters>;
 
     fn molecule_shape(&self) -> MoleculeShape<'_> {
         MoleculeShape::Heterosegmented(&self.params.component_index)
@@ -107,9 +106,6 @@ impl HelmholtzEnergyFunctionalDyn for GcPcSaftFunctional {
 
     fn contributions<'a>(&'a self) -> impl Iterator<Item = GcPcSaftFunctionalContribution<'a>> {
         let mut contributions = Vec::with_capacity(4);
-
-        let assoc =
-            YuWuAssociationFunctional::new(&self.params, &self.parameters, self.association);
 
         // Hard sphere contribution
         let hs = FMTContribution::new(&self.params, self.fmt_version);
@@ -123,15 +119,10 @@ impl HelmholtzEnergyFunctionalDyn for GcPcSaftFunctional {
         let att = AttractiveFunctional::new(&self.params);
         contributions.push(att.into());
 
-        // Association
-        if let Some(assoc) = assoc {
-            contributions.push(assoc.into());
-        }
-
         contributions.into_iter()
     }
 
-    fn bond_lengths<N: DualNum<f64> + Copy>(&self, temperature: N) -> UnGraph<(), N> {
+    fn bond_lengths<N: DualNum<Primitive = f64> + Copy>(&self, temperature: N) -> UnGraph<(), N> {
         // temperature dependent segment diameter
         let d = self.params.hs_diameter(temperature);
 
@@ -145,6 +136,16 @@ impl HelmholtzEnergyFunctionalDyn for GcPcSaftFunctional {
             },
         )
     }
+
+    fn association(&self) -> Option<Self::Association<'_>> {
+        (!self.parameters.association.is_empty()).then(|| {
+            SaftAssociationFunctional::new(
+                &self.params,
+                &self.parameters.association,
+                self.association_version,
+            )
+        })
+    }
 }
 
 impl Molarweight for GcPcSaftFunctional {
@@ -154,12 +155,12 @@ impl Molarweight for GcPcSaftFunctional {
 }
 
 impl HardSphereProperties for GcPcSaftFunctionalParameters {
-    fn monomer_shape<N: DualNum<f64>>(&self, _: N) -> MonomerShape<'_, N> {
+    fn monomer_shape<N: DualNum<Primitive = f64>>(&self, _: N) -> MonomerShape<'_, N> {
         let m = self.m.map(N::from);
         MonomerShape::Heterosegmented([m.clone(), m.clone(), m.clone(), m], &self.component_index)
     }
 
-    fn hs_diameter<D: DualNum<f64> + Copy>(&self, temperature: D) -> DVector<D> {
+    fn hs_diameter<D: DualNum<Primitive = f64> + Copy>(&self, temperature: D) -> DVector<D> {
         let ti = temperature.recip() * -3.0;
         DVector::from_fn(self.sigma.len(), |i, _| {
             -((ti * self.epsilon_k[i]).exp() * 0.12 - 1.0) * self.sigma[i]
@@ -170,7 +171,7 @@ impl HardSphereProperties for GcPcSaftFunctionalParameters {
 impl AssociationStrength for GcPcSaftFunctionalParameters {
     type Record = GcPcSaftAssociationRecord;
 
-    fn association_strength_ij<D: DualNum<f64> + Copy>(
+    fn association_strength_ij<D: DualNum<Primitive = f64> + Copy>(
         &self,
         temperature: D,
         comp_i: usize,
@@ -201,5 +202,4 @@ pub enum GcPcSaftFunctionalContribution<'a> {
     Fmt(FMTContribution<'a, GcPcSaftFunctionalParameters>),
     Chain(ChainFunctional<'a>),
     Attractive(AttractiveFunctional<'a>),
-    Association(YuWuAssociationFunctional<'a, GcPcSaftFunctionalParameters>),
 }

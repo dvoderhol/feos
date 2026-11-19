@@ -36,7 +36,7 @@ const TOL: f64 = 1e-15;
 impl Msa {
     /// Reduced Helmholtz energy density with the screening parameter solved for the given
     /// densities, diameters `diameter` and Bjerrum length `bjerrum_length`.
-    pub fn helmholtz_energy_density<D: DualNum<f64> + Copy>(
+    pub fn helmholtz_energy_density<D: DualNum<Primitive = f64> + Copy>(
         &self,
         parameters: &EPcpSaftPars<D>,
         state: &StateHD<D>,
@@ -73,7 +73,7 @@ impl Msa {
 
 /// Packing term Δ = 1 - π/6 Σ_k ρ_k d_k³ over the ions ([MsaPacking::Ions]) or over the segments of all species
 /// ([MsaPacking::Total]).
-pub(super) fn packing_term<D: DualNum<f64> + Copy>(
+pub(super) fn packing_term<D: DualNum<Primitive = f64> + Copy>(
     packing: MsaPacking,
     p: &EPcpSaftPars<D>,
     state: &StateHD<D>,
@@ -92,7 +92,7 @@ pub(super) fn packing_term<D: DualNum<f64> + Copy>(
 
 /// MSA functional of the screening parameter: Γ³ / (3π) - λ_B Σ_i ρ_i z_i (Γ z_i + η(Γ) d_i) / (1 + Γ d_i), stationary
 /// in Γ at the solution of the closure; `delta` is the packing term Δ.
-pub(super) fn msa_functional<T: DualNum<f64> + Copy>(
+pub(super) fn msa_functional<T: DualNum<Primitive = f64> + Copy>(
     gamma: T,
     rho: &[T],
     z: &[f64],
@@ -109,7 +109,13 @@ pub(super) fn msa_functional<T: DualNum<f64> + Copy>(
 }
 
 /// η of the MSA (Maribo-Mogensen et al. 2012, eqs. 26-27)
-pub(super) fn eta<T: DualNum<f64> + Copy>(gamma: T, rho: &[T], z: &[f64], d: &[T], delta: T) -> T {
+pub(super) fn eta<T: DualNum<Primitive = f64> + Copy>(
+    gamma: T,
+    rho: &[T],
+    z: &[f64],
+    d: &[T],
+    delta: T,
+) -> T {
     let mut sum_z = T::zero();
     let mut sum_d3 = T::zero();
     for ((&r, &z), &d) in rho.iter().zip(z).zip(d) {
@@ -122,7 +128,7 @@ pub(super) fn eta<T: DualNum<f64> + Copy>(gamma: T, rho: &[T], z: &[f64], d: &[T
 }
 
 /// Γ(Γ) - Γ, with Γ(Γ) the right-hand side of the closure Γ² = π λ_B Σ ρ_k ((z_k - η d_k²)/(1 + Γ d_k))²
-fn closure_residual<T: DualNum<f64> + Copy>(
+fn closure_residual<T: DualNum<Primitive = f64> + Copy>(
     gamma: T,
     rho: &[T],
     z: &[f64],
@@ -141,7 +147,7 @@ fn closure_residual<T: DualNum<f64> + Copy>(
 /// Screening parameter Γ: Newton iteration in the number type D (exact derivatives with
 /// respect to everything that D carries), started from the solution for η = 0 and equal
 /// diameters, safeguarded by the bracket 0 < Γ <= κ/2.
-pub(super) fn screening_parameter<D: DualNum<f64> + Copy>(
+pub(super) fn screening_parameter<D: DualNum<Primitive = f64> + Copy>(
     rho: &[D],
     z: &[f64],
     d: &[D],
@@ -159,7 +165,7 @@ pub(super) fn screening_parameter<D: DualNum<f64> + Copy>(
     let mut gamma = kappa / ((kappa * d_mean * 2.0 + 1.0).sqrt() + 1.0);
     let upper = kappa.re() * 0.5;
 
-    let lift = |x: D| Dual::<D, f64>::from_re(x);
+    let lift = |x: D| Dual::<D>::from_re(x);
     let rho_l: Vec<_> = rho.iter().map(|&x| lift(x)).collect();
     let d_l: Vec<_> = d.iter().map(|&x| lift(x)).collect();
     let (lambda_l, delta_l) = (lift(bjerrum_length), lift(delta));

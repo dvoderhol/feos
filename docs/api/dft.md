@@ -9,15 +9,6 @@ Implementations of Helmholtz energy functionals for DFT.
 .. currentmodule:: feos
 
 .. autosummary::
-    :toctree: generated/
-
-    HelmholtzEnergyFunctional
-```
-
-```{eval-rst}
-.. currentmodule:: feos
-
-.. autosummary::
     HelmholtzEnergyFunctional.pcsaft
     HelmholtzEnergyFunctional.epcpsaft
     HelmholtzEnergyFunctional.gc_pcsaft
@@ -32,7 +23,7 @@ Implementations of Helmholtz energy functionals for DFT.
 .. autosummary::
     :toctree: generated/
 
-    PlanarInterface
+    Interface
     SurfaceTensionDiagram
 ```
 
@@ -44,11 +35,11 @@ Implementations of Helmholtz energy functionals for DFT.
 
     ExternalPotential
     Geometry
+    Grid
     Pore1D
-    Pore2D
-    Pore3D
-    Adsorption1D
-    Adsorption3D
+    PoreProfile
+    PoreSpecification
+    Adsorption
 ```
 
 ## Solvation
@@ -68,5 +59,7 @@ Implementations of Helmholtz energy functionals for DFT.
     :toctree: generated/
 
     FMTVersion
+    AssociationVersion
     DFTSolver
+    DFTSolverLog
 ```

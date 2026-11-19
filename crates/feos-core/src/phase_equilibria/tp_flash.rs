@@ -40,7 +40,7 @@ where
     }
 }
 
-impl<E: Residual<U2, D>, D: DualNum<f64> + Copy> PhaseEquilibrium<E, 2, U2, D> {
+impl<E: Residual<U2, D>, D: DualNum<Primitive = f64> + Copy> PhaseEquilibrium<E, 2, U2, D> {
     /// Perform a Tp-flash calculation for a binary mixture.
     /// Compared to the version of the algorithm for a generic
     /// number of components ([tp_flash](PhaseEquilibrium::tp_flash)),
@@ -79,7 +79,7 @@ impl<E: Residual<U2, D>, D: DualNum<f64> + Copy> PhaseEquilibrium<E, 2, U2, D> {
                 let [[v_l, v_v, x, y]] = variables.data.0;
                 let beta = (z - x) / (y - x);
                 let eos = eos.lift();
-                let molar_gibbs_energy = |x: Dual2Vec<_, _, _>, v| {
+                let molar_gibbs_energy = |x: Dual2Vec<_, _>, v| {
                     let molefracs = vector![x, -x + 1.0];
                     let a_res = eos.residual_helmholtz_energy(t, v, &molefracs);
                     let a_ig = (x * (x / v).ln() - (x - 1.0) * ((-x + 1.0) / v).ln() - 1.0) * t;
@@ -127,16 +127,17 @@ where
     ) -> FeosResult<PhaseEquilibrium<E, 2, N>> {
         // initialization
         if let Some(initial_state) = initial_state {
+            // the feed may have changed: split it with the old K values
             let mut init = initial_state.clone();
-            init.update_states(
-                self,
-                initial_state.vapor().molefracs.clone(),
-                initial_state.liquid().molefracs.clone(),
-                initial_state.vapor_phase_fraction(),
-            )?;
-            let vle = self.tp_flash_(init, options, non_volatile_components.clone());
-            if vle.is_ok() {
-                return vle;
+            let k = initial_state
+                .vapor()
+                .molefracs
+                .component_div(&initial_state.liquid().molefracs);
+            if init.rachford_rice_inplace(self, &k).is_ok() {
+                let vle = self.tp_flash_(init, options, non_volatile_components.clone());
+                if vle.is_ok() {
+                    return vle;
+                }
             }
         }
 
@@ -246,14 +247,6 @@ where
         )?;
 
         Ok(new_vle_state)
-    }
-
-    fn tangent_plane_distance(&self, trial_state: &State<E, N>) -> f64 {
-        let ln_phi_z = self.ln_phi();
-        let ln_phi_w = trial_state.ln_phi();
-        let z = &self.molefracs;
-        let w = &trial_state.molefracs;
-        w.dot(&(w.map(f64::ln) + ln_phi_w - z.map(f64::ln) - ln_phi_z))
     }
 }
 
@@ -372,9 +365,9 @@ where
 
             self.rachford_rice_inplace(feed_state, &k)?;
             if let Some(k_vec) = k_vec
-                && i >= iterations - 3
+                && i + 4 >= iterations
             {
-                k_vec[i + 3 - iterations] = k.map(|ki| if ki > 0.0 { ki.ln() } else { 0.0 });
+                k_vec[i + 4 - iterations] = k.map(|ki| if ki > 0.0 { ki.ln() } else { 0.0 });
             }
         }
         Ok(false)
@@ -419,9 +412,12 @@ where
     }
 
     fn vle_init_stability(feed_state: &State<E, N>) -> FeosResult<(Self, Option<Self>)> {
-        let mut stable_states = feed_state.stability_analysis(SolverOptions::default())?;
-        let state1 = stable_states.pop();
-        let state2 = stable_states.pop();
+        // candidates are sorted by tpd, so the most negative ones are used
+        let mut stable_states = feed_state
+            .stability_analysis(SolverOptions::default())?
+            .into_iter();
+        let state1 = stable_states.next();
+        let state2 = stable_states.next();
         if let Some(s1) = state1 {
             let init1 = if s1.density < feed_state.density {
                 Self::two_phase(s1.clone(), feed_state.clone())
@@ -443,14 +439,16 @@ where
 
     // Total molar Gibbs energy excluding the constant contribution RT sum_i x_i ln(\Lambda_i^3)
     fn molar_gibbs_energy(&self) -> MolarEnergy {
-        self.states
-            .iter()
-            .fold(MolarEnergy::from_reduced(0.0), |acc, s| {
+        self.states.iter().zip(self.phase_fractions).fold(
+            MolarEnergy::from_reduced(0.0),
+            |acc, (s, phi)| {
                 let ln_rho_m1 = s.partial_density().to_reduced().map(|r| r.ln() - 1.0);
-                acc + s.residual_molar_helmholtz_energy()
+                acc + (s.residual_molar_helmholtz_energy()
                     + s.pressure(Contributions::Total) * s.molar_volume
-                    + RGAS * s.temperature * s.molefracs.dot(&ln_rho_m1)
-            })
+                    + RGAS * s.temperature * s.molefracs.dot(&ln_rho_m1))
+                    * phi
+            },
+        )
     }
 }
 

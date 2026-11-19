@@ -29,7 +29,7 @@ use num_dual::DualNum;
 /// diameters `d` (Å), contact values `g` of the hard-sphere mixture at (d_i + d_j)/2, logarithms of the pairing
 /// factors `f`, Bjerrum length `lb` (Å) and association constant `constant`. Returns (a / (kT V), fractions of
 /// non-paired ions X).
-pub fn bidh<D: DualNum<f64> + Copy>(
+pub fn bidh<D: DualNum<Primitive = f64> + Copy>(
     rho: &[D],
     z: &[f64],
     d: &[D],
@@ -50,7 +50,7 @@ pub fn bidh<D: DualNum<f64> + Copy>(
 }
 
 /// Association strengths Δ_ij (Å³) of the BiDH term (zero for ions of the same charge sign).
-pub fn pairing_strength<D: DualNum<f64> + Copy>(
+pub fn pairing_strength<D: DualNum<Primitive = f64> + Copy>(
     rho: &[D],
     z: &[f64],
     d: &[D],

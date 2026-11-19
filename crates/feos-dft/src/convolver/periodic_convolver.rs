@@ -26,10 +26,22 @@ pub struct PeriodicConvolver<T, D: Dimension> {
 
 impl<T, D: Dimension + 'static> PeriodicConvolver<T, D>
 where
-    T: FftNum + DualNum<f64>,
+    T: FftNum + DualNum<Primitive = f64>,
     D::Larger: Dimension<Smaller = D>,
     <D::Larger as Dimension>::Larger: Dimension<Smaller = D::Larger>,
 {
+    pub fn new_0d(weight_functions: &[WeightFunctionInfo<T>]) -> Arc<dyn Convolver<T, D>> {
+        Self::new(&[], |_| {}, weight_functions, None)
+    }
+
+    pub fn new_1d(
+        axis: &Axis,
+        weight_functions: &[WeightFunctionInfo<T>],
+        lanczos: Option<i32>,
+    ) -> Arc<dyn Convolver<T, D>> {
+        Self::new(&[axis], |_| {}, weight_functions, lanczos)
+    }
+
     pub fn new_2d(
         axes: &[&Axis],
         angle: Angle,
@@ -165,7 +177,7 @@ where
 
             // Initializing `FFTWeightFunctions` structure
             fft_weight_functions.push(FFTWeightFunctions::<_, D> {
-                segments: wf.component_index.len(),
+                segments: wf.segments,
                 local_density: wf.local_density,
                 scalar_component_weighted_densities: scal_comp,
                 vector_component_weighted_densities: vec_comp,
@@ -200,7 +212,7 @@ impl<T: FftNum, D: Dimension> PeriodicConvolver<T, D> {
     }
 
     fn forward_transform<D2: Dimension>(&self, f: ArrayView<T, D2>) -> Array<Complex<T>, D2> {
-        let offset = D2::NDIM.unwrap() - D::NDIM.unwrap();
+        let offset = f.ndim() - self.k_abs.ndim();
         let mut result = f.mapv(Complex::from);
         for (i, transform) in self.forward_transforms.iter().enumerate() {
             for r in result.lanes_mut(Axis_nd(i + offset)).into_iter() {
@@ -211,7 +223,7 @@ impl<T: FftNum, D: Dimension> PeriodicConvolver<T, D> {
     }
 
     fn inverse_transform<D2: Dimension>(&self, mut f: Array<Complex<T>, D2>) -> Array<T, D2> {
-        let offset = D2::NDIM.unwrap() - D::NDIM.unwrap();
+        let offset = f.ndim() - self.k_abs.ndim();
         for (i, transform) in self.inverse_transforms.iter().enumerate() {
             for r in f.lanes_mut(Axis_nd(i + offset)).into_iter() {
                 self.transform(transform, r);
@@ -223,7 +235,7 @@ impl<T: FftNum, D: Dimension> PeriodicConvolver<T, D> {
 
 impl<T, D: Dimension> Convolver<T, D> for PeriodicConvolver<T, D>
 where
-    T: FftNum + DualNum<f64>,
+    T: FftNum + DualNum<Primitive = f64>,
     D::Larger: Dimension<Smaller = D>,
     <D::Larger as Dimension>::Larger: Dimension<Smaller = D::Larger>,
 {

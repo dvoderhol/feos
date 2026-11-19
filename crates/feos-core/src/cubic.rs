@@ -121,14 +121,15 @@ impl ResidualDyn for PengRobinson {
         self.tc.len()
     }
 
-    fn compute_max_density<D: DualNum<f64> + Copy>(&self, molefracs: &DVector<D>) -> D {
+    fn compute_max_density<D: DualNum<Primitive = f64> + Copy>(&self, molefracs: &DVector<D>) -> D {
         D::from(0.9) / molefracs.dot(&self.b.map(D::from))
     }
 
-    fn reduced_helmholtz_energy_density_contributions<D: DualNum<f64> + Copy>(
+    fn for_each_contribution<D: DualNum<Primitive = f64> + Copy>(
         &self,
         state: &StateHD<D>,
-    ) -> Vec<(&'static str, D)> {
+        mut f: impl FnMut(&'static str, D),
+    ) {
         let density = state.partial_density.sum();
         let x = &state.molefracs;
         let ak = &self
@@ -149,11 +150,11 @@ impl ResidualDyn for PengRobinson {
 
         // Helmholtz energy
         let v = density.recip();
-        let f = density
+        let a = density
             * ((v / (v - b)).ln()
                 - ak_mix / (b * SQRT_2 * 2.0 * state.temperature)
                     * ((v + b * (1.0 + SQRT_2)) / (v + b * (1.0 - SQRT_2))).ln());
-        vec![("Peng Robinson", f)]
+        f("Peng Robinson", a)
     }
 }
 
@@ -229,30 +230,6 @@ mod tests {
             pc * PASCAL,
             max_relative = 1e-4
         );
-        Ok(())
-    }
-
-    #[test]
-    fn residual_chemical_potential_contributions() -> FeosResult<()> {
-        let parameters = PengRobinsonParameters::new(pure_record_vec(), vec![])?;
-        let pr = PengRobinson::new(parameters);
-        let state = State::new_npt(
-            &&pr,
-            300.0 * KELVIN,
-            20.0 * quantity::BAR,
-            &nalgebra::dvector![0.3, 0.7] * quantity::MOL,
-            None,
-        )?;
-        let mu = state.residual_chemical_potential();
-        for i in 0..2 {
-            let sum = state
-                .residual_chemical_potential_contributions(i)
-                .into_iter()
-                .fold(0.0 * quantity::JOULE / quantity::MOL, |acc, (_, mu_i)| {
-                    acc + mu_i
-                });
-            assert_relative_eq!(sum, mu.get(i), max_relative = 1e-12);
-        }
         Ok(())
     }
 }

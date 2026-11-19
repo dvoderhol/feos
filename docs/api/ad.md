@@ -72,7 +72,7 @@ Parameters are given as `(name, indices)`:
 |`dipole_scaling`, `polarizability_scaling`, `correlation_integral_parameter`|`[i]`|
 |`k_ij`|`[i, j]`|
 |`ion_pairing`|`[i, j]` (cation and anion; variants `"bidh"`, `"bimsa"`)|
-|`born_delta_cation`, `born_delta_anion`|`[]`|
+|`born_delta_cation`, `born_delta_anion`, `dh_delta`|`[]`|
 
 All options of `EquationOfState.epcpsaft` can be passed, including `epcpsaft_variant` (`"dh"`: Debye-Hückel,
 `"msa"`: mean spherical approximation, `"bidh"`: Debye-Hückel with ion pairing, `"bimsa"`: binding mean spherical

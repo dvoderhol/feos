@@ -9,7 +9,7 @@ pub fn epsilon_0() -> f64 {
     (EPSILON0 / (FARAD / METER)).into_value()
 }
 
-impl<D: DualNum<f64> + Copy> EPcpSaftPars<D> {
+impl<D: DualNum<Primitive = f64> + Copy> EPcpSaftPars<D> {
     /// Relative permittivity of the mixture (Rueben et al. 2024, perturbation theory of Neumaier et al. 2022).
     ///
     /// eps_r = 1 + 3y [1 + y + (17/16 I - 1) y^2],  I = 1 + a2 (exp(-y) - 1),

@@ -1,9 +1,9 @@
 use super::PyEquationOfState;
 #[cfg(feature = "dft")]
-use crate::dft::{PyFMTVersion, PyHelmholtzEnergyFunctional};
+use crate::dft::{PyAssociationVersion, PyFMTVersion, PyHelmholtzEnergyFunctional};
 use crate::error::PyFeosError;
 use crate::ideal_gas::IdealGasModel;
-use crate::parameter::{PyGcParameters, PyParameters};
+use crate::parameter::{PyParameters, PyParametersOrGcParameters};
 use crate::residual::ResidualModel;
 use crate::state::PyState;
 #[cfg(feature = "dft")]
@@ -144,12 +144,11 @@ impl PyEquationOfState {
     ///     states.
     #[staticmethod]
     #[pyo3(
-        signature = (parameters, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", epcpsaft_variant="dh", msa_packing="ions", born_delta_cation=0.0, born_delta_anion=0.0, born_diameter="hs", dh_delta=0.0, ion_pairing_constant="bjerrum"),
-        text_signature = r#"(parameters, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", epcpsaft_variant="dh", msa_packing="ions", born_delta_cation=0.0, born_delta_anion=0.0, born_diameter="hs", dh_delta=0.0, ion_pairing_constant="bjerrum")"#
+        signature = (parameters, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", epcpsaft_variant="dh", msa_packing="ions", born_delta_cation=0.0, born_delta_anion=0.0, born_diameter="hs", dh_delta=0.0, ion_pairing_constant="bjerrum")
     )]
     #[expect(clippy::too_many_arguments)]
     pub fn epcpsaft(
-        parameters: &Bound<'_, PyAny>,
+        parameters: PyParametersOrGcParameters,
         max_eta: f64,
         max_iter_cross_assoc: usize,
         tol_cross_assoc: f64,
@@ -175,14 +174,11 @@ impl PyEquationOfState {
             dh_delta,
             ion_pairing_constant,
         )?;
-        let parameters = if let Ok(parameters) = parameters.extract::<PyParameters>() {
-            parameters.try_convert()
-        } else if let Ok(parameters) = parameters.extract::<PyGcParameters>() {
-            parameters.try_convert_homosegmented()
-        } else {
-            return Err(PyErr::new::<PyValueError, _>(
-                "Argument `parameters` must by Parameters or GcParameters",
-            ));
+        let parameters = match parameters {
+            PyParametersOrGcParameters::Parameters(parameters) => parameters.try_convert(),
+            PyParametersOrGcParameters::GcParameters(parameters) => {
+                parameters.try_convert_homosegmented()
+            }
         }?;
         let residual = ResidualModel::EPcpSaft(
             EPcpSaft::with_options(parameters, options).map_err(PyFeosError::from)?,
@@ -203,6 +199,8 @@ impl PyHelmholtzEnergyFunctional {
     ///     The set of ePCP-SAFT parameters.
     /// fmt_version: FMTVersion, optional
     ///     The specific variant of the FMT term. Defaults to FMTVersion.WhiteBear
+    /// association_version: AssociationVersion, optional
+    ///     The version of the association functional. Defaults to AssociationVersion.ISaft
     /// max_eta : float, optional
     ///     Maximum packing fraction. Defaults to 0.5.
     /// max_iter_cross_assoc : unsigned integer, optional
@@ -217,12 +215,12 @@ impl PyHelmholtzEnergyFunctional {
     /// HelmholtzEnergyFunctional
     #[staticmethod]
     #[pyo3(
-        signature = (parameters, fmt_version=PyFMTVersion::WhiteBear, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35"),
-        text_signature = r#"(parameters, fmt_version, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35")"#
+        signature = (parameters, fmt_version=PyFMTVersion::WhiteBear, association_version=PyAssociationVersion::ISaft, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35")
     )]
     fn epcpsaft(
         parameters: PyParameters,
         fmt_version: PyFMTVersion,
+        association_version: PyAssociationVersion,
         max_eta: f64,
         max_iter_cross_assoc: usize,
         tol_cross_assoc: f64,
@@ -239,6 +237,7 @@ impl PyHelmholtzEnergyFunctional {
             EPcpSaftFunctional::with_options(
                 parameters.try_convert()?,
                 fmt_version.into(),
+                association_version.into(),
                 options,
             )
             .map_err(PyFeosError::from)?,
@@ -257,7 +256,6 @@ impl PyState {
     /// Returns
     /// -------
     /// float
-    #[pyo3(text_signature = "($self)")]
     fn permittivity(&self) -> PyResult<f64> {
         let s = &self.0;
         let eos = match &s.eos.residual {
@@ -269,7 +267,7 @@ impl PyState {
             }
         };
         let partial_density = &s.molefracs * s.density.into_reduced();
-        let state = StateHD::new_density(s.temperature.into_reduced(), &partial_density);
+        let state = StateHD::new_density(s.temperature.into_reduced(), partial_density);
         eos.permittivity(&state)
             .ok_or_else(|| PyErr::new::<PyValueError, _>("A component has no permittivity record."))
     }

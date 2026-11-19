@@ -184,7 +184,7 @@ pub struct GcPcSaftADParameters<D, const N: usize> {
     pub bonds: [Vec<([usize; 2], D)>; N],
 }
 
-impl<D: DualNum<f64> + Copy, const N: usize> GcPcSaftADParameters<D, N> {
+impl<D: DualNum<Primitive = f64> + Copy, const N: usize> GcPcSaftADParameters<D, N> {
     pub fn re(&self) -> GcPcSaftADParameters<f64, N> {
         let Self { groups, bonds } = self;
         let groups = groups.map(|g| g.re());
@@ -195,7 +195,7 @@ impl<D: DualNum<f64> + Copy, const N: usize> GcPcSaftADParameters<D, N> {
     }
 }
 
-impl<D: DualNum<f64> + Copy, const N: usize> GcPcSaftADParameters<D, N> {
+impl<D: DualNum<Primitive = f64> + Copy, const N: usize> GcPcSaftADParameters<D, N> {
     pub fn from_groups(
         group_map: [&HashMap<&'static str, D>; N],
         bond_map: [&HashMap<[&'static str; 2], D>; N],
@@ -220,17 +220,19 @@ impl<D: DualNum<f64> + Copy, const N: usize> GcPcSaftADParameters<D, N> {
 #[derive(Clone)]
 pub struct GcPcSaftAD<D, const N: usize>(pub GcPcSaftADParameters<D, N>);
 
-impl<D: DualNum<f64> + Copy, const N: usize> Residual<Const<N>, D> for GcPcSaftAD<D, N> {
+impl<D: DualNum<Primitive = f64> + Copy, const N: usize> Residual<Const<N>, D>
+    for GcPcSaftAD<D, N>
+{
     fn components(&self) -> usize {
         N
     }
 
     type Real = GcPcSaftAD<f64, N>;
-    type Lifted<D2: DualNum<f64, Inner = D> + Copy> = GcPcSaftAD<D2, N>;
+    type Lifted<D2: DualNum<Primitive = f64, Inner = D> + Copy> = GcPcSaftAD<D2, N>;
     fn re(&self) -> Self::Real {
         GcPcSaftAD(self.0.re())
     }
-    fn lift<D2: DualNum<f64, Inner = D> + Copy>(&self) -> Self::Lifted<D2> {
+    fn lift<D2: DualNum<Primitive = f64, Inner = D> + Copy>(&self) -> Self::Lifted<D2> {
         let GcPcSaftADParameters { groups, bonds } = &self.0;
         let groups = groups.map(|x| D2::from_inner(&x));
         let bonds = bonds
@@ -248,17 +250,11 @@ impl<D: DualNum<f64> + Copy, const N: usize> Residual<Const<N>, D> for GcPcSaftA
         ((msigma3 * molefracs).into_scalar() * FRAC_PI_6).recip() * MAX_ETA
     }
 
-    fn reduced_helmholtz_energy_density_contributions(
+    fn for_each_contribution(
         &self,
         state: &StateHD<D, Const<N>>,
-    ) -> Vec<(&'static str, D)> {
-        vec![(
-            "gc-PC-SAFT",
-            self.reduced_residual_helmholtz_energy_density(state),
-        )]
-    }
-
-    fn reduced_residual_helmholtz_energy_density(&self, state: &StateHD<D, Const<N>>) -> D {
+        mut f: impl FnMut(&'static str, D),
+    ) {
         let GcPcSaftADParameters { groups, bonds } = &self.0;
         let density = &state.partial_density;
 
@@ -412,11 +408,11 @@ impl<D: DualNum<f64> + Copy, const N: usize> Residual<Const<N>, D> for GcPcSaftA
             dipole = phi2
         }
 
-        hs + hc + disp + dipole
+        f("gc-PC-SAFT", hs + hc + disp + dipole)
     }
 }
 
-fn apply_group_count<D: DualNum<f64> + Copy, const N: usize>(
+fn apply_group_count<D: DualNum<Primitive = f64> + Copy, const N: usize>(
     groups: &SMatrix<D, N_GROUPS, N>,
     x: &SVector<D, N_GROUPS>,
 ) -> SMatrix<D, N_GROUPS, N> {
@@ -426,7 +422,7 @@ fn apply_group_count<D: DualNum<f64> + Copy, const N: usize>(
     ms
 }
 
-fn pair_integral<D: DualNum<f64> + Copy>(mij1: D, mij2: D, eta: D, eps_ij_t: D) -> D {
+fn pair_integral<D: DualNum<Primitive = f64> + Copy>(mij1: D, mij2: D, eta: D, eps_ij_t: D) -> D {
     let mut eta_i = D::one();
     let mut j = D::zero();
     for (ad, bd) in AD.into_iter().zip(BD) {
@@ -438,7 +434,7 @@ fn pair_integral<D: DualNum<f64> + Copy>(mij1: D, mij2: D, eta: D, eps_ij_t: D) 
     j
 }
 
-fn triplet_integral<D: DualNum<f64> + Copy>(mij1: D, mij2: D, eta: D) -> D {
+fn triplet_integral<D: DualNum<Primitive = f64> + Copy>(mij1: D, mij2: D, eta: D) -> D {
     let mut eta_i = D::one();
     let mut j = D::zero();
     for cd in CD {

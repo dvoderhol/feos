@@ -4,7 +4,9 @@ use crate::residual::ResidualModel;
 use feos_core::*;
 use indexmap::IndexMap;
 use nalgebra::{DVector, DVectorView, Dyn, U1};
-use numpy::{PyArray1, PyReadonlyArray1, ToPyArray};
+use numpy::{PyArray1, PyArrayDyn, PyArrayMethods, PyReadonlyArray1, ToPyArray};
+#[cfg(feature = "experimental-inspect")]
+use pyo3::type_hint_union;
 use pyo3::{exceptions::PyValueError, prelude::*};
 use quantity::*;
 use std::ops::Div;
@@ -39,19 +41,22 @@ pub struct PyEquationOfState(pub Arc<EquationOfState<Vec<IdealGasModel>, Residua
 #[pymethods]
 impl PyEquationOfState {
     #[getter]
-    fn get_parameters<'py>(&self, py: Python<'py>) -> IndexMap<String, Bound<'py, PyAny>> {
+    fn get_parameters<'py>(
+        &self,
+        py: Python<'py>,
+    ) -> IndexMap<String, Bound<'py, PyArrayDyn<f64>>> {
         let pure = self.0.pure_parameters();
         let binary = self.0.binary_parameters();
         let association_ab = self.0.association_parameters_ab();
         let association_cc = self.0.association_parameters_cc();
         pure.into_iter()
-            .map(|(k, v)| (k, PyArray1::from_slice(py, v.as_slice()).into_any()))
+            .map(|(k, v)| (k, PyArray1::from_slice(py, v.as_slice()).to_dyn().clone()))
             .chain(
                 binary
                     .into_iter()
                     .chain(association_ab)
                     .chain(association_cc)
-                    .map(|(k, v)| (k, v.to_pyarray(py).into_any())),
+                    .map(|(k, v)| (k, v.to_pyarray(py).to_dyn().clone())),
             )
             .collect()
     }
@@ -66,11 +71,11 @@ impl PyEquationOfState {
     /// Returns
     /// -------
     /// SINumber
-    #[pyo3(text_signature = "(composition=None)", signature = (composition=None))]
-    fn max_density(&self, composition: Option<&Bound<'_, PyAny>>) -> PyResult<Density> {
+    #[pyo3(signature = (composition=None))]
+    fn max_density(&self, composition: Option<PyComposition>) -> PyResult<Density> {
         Ok(self
             .0
-            .max_density(Compositions::try_from(composition)?)
+            .max_density(composition.unwrap_or_default())
             .map_err(PyFeosError::from)?)
     }
 
@@ -86,15 +91,15 @@ impl PyEquationOfState {
     /// Returns
     /// -------
     /// SINumber
-    #[pyo3(text_signature = "(temperature, composition=None)", signature = (temperature, composition=None))]
+    #[pyo3(signature = (temperature, composition=None))]
     fn second_virial_coefficient(
         &self,
         temperature: Temperature,
-        composition: Option<&Bound<'_, PyAny>>,
+        composition: Option<PyComposition>,
     ) -> PyResult<Quot<f64, Density>> {
         Ok(self
             .0
-            .second_virial_coefficient(temperature, Compositions::try_from(composition)?)
+            .second_virial_coefficient(temperature, composition.unwrap_or_default())
             .map_err(PyFeosError::from)?)
     }
 
@@ -110,15 +115,15 @@ impl PyEquationOfState {
     /// Returns
     /// -------
     /// SINumber
-    #[pyo3(text_signature = "(temperature, composition=None)", signature = (temperature, composition=None))]
+    #[pyo3(signature = (temperature, composition=None))]
     fn third_virial_coefficient(
         &self,
         temperature: Temperature,
-        composition: Option<&Bound<'_, PyAny>>,
+        composition: Option<PyComposition>,
     ) -> PyResult<Quot<Quot<f64, Density>, Density>> {
         Ok(self
             .0
-            .third_virial_coefficient(temperature, Compositions::try_from(composition)?)
+            .third_virial_coefficient(temperature, composition.unwrap_or_default())
             .map_err(PyFeosError::from)?)
     }
 
@@ -135,17 +140,17 @@ impl PyEquationOfState {
     /// Returns
     /// -------
     /// SINumber
-    #[pyo3(text_signature = "(temperature, composition=None)", signature = (temperature, composition=None))]
+    #[pyo3(signature = (temperature, composition=None))]
     fn second_virial_coefficient_temperature_derivative(
         &self,
         temperature: Temperature,
-        composition: Option<&Bound<'_, PyAny>>,
+        composition: Option<PyComposition>,
     ) -> PyResult<Quot<Quot<f64, Density>, Temperature>> {
         Ok(self
             .0
             .second_virial_coefficient_temperature_derivative(
                 temperature,
-                Compositions::try_from(composition)?,
+                composition.unwrap_or_default(),
             )
             .map_err(PyFeosError::from)?)
     }
@@ -164,17 +169,17 @@ impl PyEquationOfState {
     /// -------
     /// SINumber
     #[expect(clippy::type_complexity)]
-    #[pyo3(text_signature = "(temperature, composition=None)", signature = (temperature, composition=None))]
+    #[pyo3(signature = (temperature, composition=None))]
     fn third_virial_coefficient_temperature_derivative(
         &self,
         temperature: Temperature,
-        composition: Option<&Bound<'_, PyAny>>,
+        composition: Option<PyComposition>,
     ) -> PyResult<Quot<Quot<Quot<f64, Density>, Density>, Temperature>> {
         Ok(self
             .0
             .third_virial_coefficient_temperature_derivative(
                 temperature,
-                Compositions::try_from(composition)?,
+                composition.unwrap_or_default(),
             )
             .map_err(PyFeosError::from)?)
     }
@@ -205,8 +210,11 @@ pub(crate) fn parse_molefracs(molefracs: Option<PyReadonlyArray1<f64>>) -> Optio
     })
 }
 
-#[derive(Clone)]
-pub enum Compositions {
+/// A composition as accepted from Python: moles, total moles, molefracs (array or list), or a
+/// single molefrac. `None` lets the model decide (only valid for pure components).
+#[derive(Clone, Default)]
+pub enum PyComposition {
+    #[default]
     None,
     Scalar(f64),
     TotalMoles(Moles<f64>),
@@ -214,7 +222,7 @@ pub enum Compositions {
     Moles(Moles<DVector<f64>>),
 }
 
-impl Composition<f64, Dyn> for Compositions {
+impl Composition<f64, Dyn> for PyComposition {
     fn into_molefracs<E: Residual<Dyn, f64>>(
         self,
         eos: &E,
@@ -229,27 +237,35 @@ impl Composition<f64, Dyn> for Compositions {
     }
 }
 
-impl TryFrom<Option<&Bound<'_, PyAny>>> for Compositions {
+impl<'a, 'py> FromPyObject<'a, 'py> for PyComposition {
     type Error = PyErr;
-    fn try_from(composition: Option<&Bound<'_, PyAny>>) -> PyResult<Compositions> {
-        let Some(composition) = composition else {
-            return Ok(Compositions::None);
-        };
+
+    #[cfg(feature = "experimental-inspect")]
+    const INPUT_TYPE: pyo3::inspect::PyStaticExpr = type_hint_union!(
+        <Moles<DVector<f64>> as FromPyObject<'static, 'static>>::INPUT_TYPE,
+        <Moles as FromPyObject<'static, 'static>>::INPUT_TYPE,
+        <PyReadonlyArray1<'static, f64> as FromPyObject<'static, 'static>>::INPUT_TYPE,
+        <Vec<f64> as FromPyObject<'static, 'static>>::INPUT_TYPE,
+        <f64 as FromPyObject<'static, 'static>>::INPUT_TYPE
+    );
+
+    fn extract(composition: Borrowed<'a, 'py, PyAny>) -> PyResult<Self> {
         if let Ok(x) = composition.extract::<PyReadonlyArray1<f64>>()
             && let Some(x) = x.try_as_matrix::<Dyn, U1, Dyn, Dyn>()
         {
-            Ok(Compositions::Molefracs(x.clone_owned()))
+            Ok(PyComposition::Molefracs(x.clone_owned()))
         } else if let Ok(x) = composition.extract::<Vec<f64>>() {
-            Ok(Compositions::Molefracs(DVector::from_vec(x)))
+            Ok(PyComposition::Molefracs(DVector::from_vec(x)))
         } else if let Ok(x) = composition.extract::<f64>() {
-            Ok(Compositions::Scalar(x))
+            Ok(PyComposition::Scalar(x))
         } else if let Ok(n) = composition.extract::<Moles<DVector<f64>>>() {
-            Ok(Compositions::Moles(n))
+            Ok(PyComposition::Moles(n))
         } else if let Ok(n) = composition.extract::<Moles>() {
-            Ok(Compositions::TotalMoles(n))
+            Ok(PyComposition::TotalMoles(n))
         } else {
             Err(PyErr::new::<PyValueError, _>(format!(
-                "failed to parse value '{composition}' as composition."
+                "failed to parse value '{}' as composition.",
+                *composition
             )))
         }
     }

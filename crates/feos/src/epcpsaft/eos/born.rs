@@ -14,7 +14,7 @@ impl Born {
     /// Reduced Helmholtz energy density
     /// a / (kT V) = -lambda_B (eps_r - 1) sum_i rho_i z_i^2 / d_Born,i
     /// with lambda_B = e^2 / (4 pi eps_0 eps_r kB T), i.e. -e^2 / (4 pi eps_0 kB T) (1 - 1/eps_r) sum_i rho_i z_i^2 / d_Born,i.
-    pub fn helmholtz_energy_density<D: DualNum<f64> + Copy>(
+    pub fn helmholtz_energy_density<D: DualNum<Primitive = f64> + Copy>(
         &self,
         parameters: &EPcpSaftPars<D>,
         state: &StateHD<D>,

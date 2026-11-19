@@ -3,11 +3,12 @@ use feos_dft::adsorption::FluidParameters;
 use feos_dft::solvation::PairPotential;
 use feos_dft::{
     FunctionalContribution, HelmholtzEnergyFunctional, HelmholtzEnergyFunctionalDyn, MoleculeShape,
-    WeightFunction, WeightFunctionInfo, WeightFunctionShape,
+    NoAssociation, WeightFunction, WeightFunctionInfo, WeightFunctionShape,
 };
 use nalgebra::DVector;
 use ndarray::*;
 use num_dual::DualNum;
+use quantity::Energy;
 use std::f64::consts::PI;
 
 use super::{HardSphereProperties, MonomerShape};
@@ -82,107 +83,105 @@ impl<'p, P: HardSphereProperties + Send + Sync> FunctionalContribution for FMTCo
         }
     }
 
-    fn weight_functions<N: DualNum<f64> + Copy>(&self, temperature: N) -> WeightFunctionInfo<N> {
+    fn weight_functions<N: DualNum<Primitive = f64> + Copy>(
+        &self,
+        temperature: N,
+    ) -> WeightFunctionInfo<N> {
         let r = self.properties.hs_diameter(temperature) * N::from(0.5);
         let [c0, c1, c2, c3] = self.properties.geometry_coefficients(temperature);
         match (self.version, r.len()) {
-            (FMTVersion::WhiteBear | FMTVersion::AntiSymWhiteBear, 1) => WeightFunctionInfo::new(
-                self.properties.component_index().into_owned().into(),
-                false,
-            )
-            .extend(
-                vec![
-                    WeightFunctionShape::Delta,
-                    WeightFunctionShape::Theta,
-                    WeightFunctionShape::DeltaVec,
-                ]
-                .into_iter()
-                .zip([c2, c3.clone(), c3])
-                .map(|(s, c)| WeightFunction {
-                    prefactor: c,
-                    kernel_radius: r.clone(),
-                    shape: s,
-                })
-                .collect(),
-                false,
-            ),
-            (FMTVersion::WhiteBear | FMTVersion::AntiSymWhiteBear, _) => WeightFunctionInfo::new(
-                self.properties.component_index().into_owned().into(),
-                false,
-            )
-            .add(
-                WeightFunction {
-                    prefactor: c0.zip_map(&r, |c, r| r.powi(-2) * c / (4.0 * PI)),
-                    kernel_radius: r.clone(),
-                    shape: WeightFunctionShape::Delta,
-                },
-                true,
-            )
-            .add(
-                WeightFunction {
-                    prefactor: c1.zip_map(&r, |c, r| r.recip() * c / (4.0 * PI)),
-                    kernel_radius: r.clone(),
-                    shape: WeightFunctionShape::Delta,
-                },
-                true,
-            )
-            .add(
-                WeightFunction {
-                    prefactor: c2,
-                    kernel_radius: r.clone(),
-                    shape: WeightFunctionShape::Delta,
-                },
-                true,
-            )
-            .add(
-                WeightFunction {
-                    prefactor: c3.clone(),
-                    kernel_radius: r.clone(),
-                    shape: WeightFunctionShape::Theta,
-                },
-                true,
-            )
-            .add(
-                WeightFunction {
-                    prefactor: c3.zip_map(&r, |c, r| r.recip() * c / (4.0 * PI)),
-                    kernel_radius: r.clone(),
-                    shape: WeightFunctionShape::DeltaVec,
-                },
-                true,
-            )
-            .add(
-                WeightFunction {
-                    prefactor: c3,
-                    kernel_radius: r,
-                    shape: WeightFunctionShape::DeltaVec,
-                },
-                true,
-            ),
-            (FMTVersion::KierlikRosinberg, _) => WeightFunctionInfo::new(
-                self.properties.component_index().into_owned().into(),
-                false,
-            )
-            .extend(
-                vec![
-                    WeightFunctionShape::KR0,
-                    WeightFunctionShape::KR1,
-                    WeightFunctionShape::Delta,
-                    WeightFunctionShape::Theta,
-                ]
-                .into_iter()
-                .zip(self.properties.geometry_coefficients(temperature))
-                .map(|(s, c)| WeightFunction {
-                    prefactor: c,
-                    kernel_radius: r.clone(),
-                    shape: s,
-                })
-                .collect(),
-                true,
-            ),
+            (FMTVersion::WhiteBear | FMTVersion::AntiSymWhiteBear, 1) => {
+                WeightFunctionInfo::new(self.properties.component_index().len(), false).extend(
+                    vec![
+                        WeightFunctionShape::Delta,
+                        WeightFunctionShape::Theta,
+                        WeightFunctionShape::DeltaVec,
+                    ]
+                    .into_iter()
+                    .zip([c2, c3.clone(), c3])
+                    .map(|(s, c)| WeightFunction {
+                        prefactor: c,
+                        kernel_radius: r.clone(),
+                        shape: s,
+                    })
+                    .collect(),
+                    false,
+                )
+            }
+            (FMTVersion::WhiteBear | FMTVersion::AntiSymWhiteBear, _) => {
+                WeightFunctionInfo::new(self.properties.component_index().len(), false)
+                    .add(
+                        WeightFunction {
+                            prefactor: c0.zip_map(&r, |c, r| r.powi(-2) * c / (4.0 * PI)),
+                            kernel_radius: r.clone(),
+                            shape: WeightFunctionShape::Delta,
+                        },
+                        true,
+                    )
+                    .add(
+                        WeightFunction {
+                            prefactor: c1.zip_map(&r, |c, r| r.recip() * c / (4.0 * PI)),
+                            kernel_radius: r.clone(),
+                            shape: WeightFunctionShape::Delta,
+                        },
+                        true,
+                    )
+                    .add(
+                        WeightFunction {
+                            prefactor: c2,
+                            kernel_radius: r.clone(),
+                            shape: WeightFunctionShape::Delta,
+                        },
+                        true,
+                    )
+                    .add(
+                        WeightFunction {
+                            prefactor: c3.clone(),
+                            kernel_radius: r.clone(),
+                            shape: WeightFunctionShape::Theta,
+                        },
+                        true,
+                    )
+                    .add(
+                        WeightFunction {
+                            prefactor: c3.zip_map(&r, |c, r| r.recip() * c / (4.0 * PI)),
+                            kernel_radius: r.clone(),
+                            shape: WeightFunctionShape::DeltaVec,
+                        },
+                        true,
+                    )
+                    .add(
+                        WeightFunction {
+                            prefactor: c3,
+                            kernel_radius: r,
+                            shape: WeightFunctionShape::DeltaVec,
+                        },
+                        true,
+                    )
+            }
+            (FMTVersion::KierlikRosinberg, _) => {
+                WeightFunctionInfo::new(self.properties.component_index().len(), false).extend(
+                    vec![
+                        WeightFunctionShape::KR0,
+                        WeightFunctionShape::KR1,
+                        WeightFunctionShape::Delta,
+                        WeightFunctionShape::Theta,
+                    ]
+                    .into_iter()
+                    .zip(self.properties.geometry_coefficients(temperature))
+                    .map(|(s, c)| WeightFunction {
+                        prefactor: c,
+                        kernel_radius: r.clone(),
+                        shape: s,
+                    })
+                    .collect(),
+                    true,
+                )
+            }
         }
     }
 
-    fn helmholtz_energy_density<N: DualNum<f64> + Copy>(
+    fn helmholtz_energy_density<N: DualNum<Primitive = f64> + Copy>(
         &self,
         temperature: N,
         weighted_densities: ArrayView2<N>,
@@ -284,7 +283,7 @@ impl HardSphereProperties for HardSphereParameters {
         MonomerShape::Spherical(self.sigma.len())
     }
 
-    fn hs_diameter<N: DualNum<f64>>(&self, _: N) -> DVector<N> {
+    fn hs_diameter<N: DualNum<Primitive = f64>>(&self, _: N) -> DVector<N> {
         self.sigma.map(N::from)
     }
 }
@@ -322,15 +321,16 @@ impl ResidualDyn for FMTFunctional {
         self.properties.sigma.len()
     }
 
-    fn compute_max_density<D: DualNum<f64> + Copy>(&self, molefracs: &DVector<D>) -> D {
+    fn compute_max_density<D: DualNum<Primitive = f64> + Copy>(&self, molefracs: &DVector<D>) -> D {
         molefracs.dot(&self.properties.sigma.map(D::from)).recip() * 1.2
     }
 
-    fn reduced_helmholtz_energy_density_contributions<D: DualNum<f64> + Copy>(
+    fn for_each_contribution<D: DualNum<Primitive = f64> + Copy>(
         &self,
         state: &StateHD<D>,
-    ) -> Vec<(&'static str, D)> {
-        self.evaluate_bulk(state)
+        f: impl FnMut(&'static str, D),
+    ) {
+        self.evaluate_bulk(state, f)
     }
 }
 
@@ -339,6 +339,7 @@ impl HelmholtzEnergyFunctionalDyn for FMTFunctional {
         = FMTContribution<'a, HardSphereParameters>
     where
         Self: 'a;
+    type Association<'a> = NoAssociation;
 
     fn contributions<'a>(
         &'a self,
@@ -352,15 +353,15 @@ impl HelmholtzEnergyFunctionalDyn for FMTFunctional {
 }
 
 impl PairPotential for FMTFunctional {
-    fn pair_potential(&self, i: usize, r: &Array1<f64>, _: f64) -> Array2<f64> {
+    fn pair_potential(&self, i: usize, r: &Array1<f64>, _: f64) -> Energy<Array2<f64>> {
         let s = &self.properties.sigma;
-        Array::from_shape_fn((s.len(), r.len()), |(j, k)| {
+        Energy::new(Array::from_shape_fn((s.len(), r.len()), |(j, k)| {
             if r[k] > 0.5 * (s[i] + s[j]) {
                 0.0
             } else {
                 f64::INFINITY
             }
-        })
+        }))
     }
 }
 

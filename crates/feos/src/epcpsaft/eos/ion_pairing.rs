@@ -27,7 +27,7 @@ const EXTRA_ITERATIONS: usize = 4;
 ///
 /// The series converges for all t; the terms are evaluated in the number type D, so that all derivatives
 /// are those of the series (truncated where the real part of a term is below 1e-17 of the sum).
-pub fn exponential_integral<D: DualNum<f64> + Copy>(t: D) -> D {
+pub fn exponential_integral<D: DualNum<Primitive = f64> + Copy>(t: D) -> D {
     let mut term = D::one(); // t^k / k!
     let mut sum = D::zero();
     for k in 1..=EI_MAX_TERMS {
@@ -42,7 +42,7 @@ pub fn exponential_integral<D: DualNum<f64> + Copy>(t: D) -> D {
 }
 
 /// G(t) = ∫ e^t / t⁴ dt = Ei(t) / 6 - e^t (t² + t + 2) / (6 t³).
-fn bjerrum_primitive<D: DualNum<f64> + Copy>(t: D) -> D {
+fn bjerrum_primitive<D: DualNum<Primitive = f64> + Copy>(t: D) -> D {
     exponential_integral(t) / 6.0 - t.exp() * (t * t + t + 2.0) / (t.powi(3) * 6.0)
 }
 
@@ -52,7 +52,7 @@ fn bjerrum_primitive<D: DualNum<f64> + Copy>(t: D) -> D {
 ///
 /// with l = |z_i z_j| λ_B (Å) and the distance of closest approach σ (Å). In molar units,
 /// K / (L/mol) = K / Å³ × N_A × 1e-27.
-pub fn bjerrum_constant<D: DualNum<f64> + Copy>(l: D, sigma: D) -> D {
+pub fn bjerrum_constant<D: DualNum<Primitive = f64> + Copy>(l: D, sigma: D) -> D {
     let b = l / sigma;
     if b.re() <= 2.0 {
         return D::zero();
@@ -67,7 +67,7 @@ pub fn bjerrum_constant<D: DualNum<f64> + Copy>(l: D, sigma: D) -> D {
 ///
 /// with l = |z_i z_j| λ_B (Å) and the distance of closest approach σ (Å). K is analytic in b (no cutoff), of order
 /// b⁴ for small b and equal to the Bjerrum constant to leading order for large b.
-pub fn ebeling_constant<D: DualNum<f64> + Copy>(l: D, sigma: D) -> D {
+pub fn ebeling_constant<D: DualNum<Primitive = f64> + Copy>(l: D, sigma: D) -> D {
     let b = l / sigma;
     let b2 = b * b;
     // term_m = b^{2m} / (2m)!
@@ -97,7 +97,7 @@ pub enum PairingConstant {
 
 impl PairingConstant {
     /// Association constant (Å³) for l = |z_i z_j| λ_B and the distance of closest approach σ.
-    pub fn constant<D: DualNum<f64> + Copy>(&self, l: D, sigma: D) -> D {
+    pub fn constant<D: DualNum<Primitive = f64> + Copy>(&self, l: D, sigma: D) -> D {
         match self {
             Self::Bjerrum => bjerrum_constant(l, sigma),
             Self::Ebeling => ebeling_constant(l, sigma),
@@ -109,7 +109,7 @@ impl PairingConstant {
 ///
 /// Successive substitution in f64 to convergence, then Newton steps in the number type D: the result has the
 /// derivatives of the solution of X_i (1 + Σ_j ρ_j X_j Δ_ij) = 1 with respect to everything that D carries.
-pub fn non_paired_fractions<D: DualNum<f64> + Copy>(
+pub fn non_paired_fractions<D: DualNum<Primitive = f64> + Copy>(
     rho: &DVector<D>,
     delta: &DMatrix<D>,
 ) -> DVector<D> {
@@ -138,7 +138,7 @@ pub fn non_paired_fractions<D: DualNum<f64> + Copy>(
 /// Newton iteration for g_i(X) = X_i (1 + Σ_j ρ_j X_j Δ_ij) - 1 = 0 in the number type D with the Jacobian of the
 /// real parts: every step at the converged real solution makes one more order of the derivatives exact; with
 /// `converged_start`, EXTRA_ITERATIONS steps.
-fn newton<D: DualNum<f64> + Copy>(
+fn newton<D: DualNum<Primitive = f64> + Copy>(
     x0: &DVector<D>,
     rho: &DVector<D>,
     delta: &DMatrix<D>,
@@ -171,7 +171,7 @@ fn newton<D: DualNum<f64> + Copy>(
 }
 
 /// Reduced Helmholtz energy density of the pairing a / (kT V) = Σ_i ρ_i (ln X_i - X_i / 2 + 1/2).
-pub fn pairing_helmholtz_energy_density<D: DualNum<f64> + Copy>(
+pub fn pairing_helmholtz_energy_density<D: DualNum<Primitive = f64> + Copy>(
     rho: &DVector<D>,
     x: &DVector<D>,
 ) -> D {

@@ -11,9 +11,9 @@ const MAX_ETA: f64 = 0.5;
 
 /// Optimized implementation of PC-SAFT for a single component.
 #[derive(Clone, Copy)]
-pub struct EPcpSaftPure<D: DualNum<f64> + Copy, const N: usize>(pub [D; N]);
+pub struct EPcpSaftPure<D: DualNum<Primitive = f64> + Copy, const N: usize>(pub [D; N]);
 
-fn helmholtz_energy_density_non_assoc<D: DualNum<f64> + Copy>(
+fn helmholtz_energy_density_non_assoc<D: DualNum<Primitive = f64> + Copy>(
     m: D,
     sigma: D,
     epsilon_k: D,
@@ -88,7 +88,7 @@ fn helmholtz_energy_density_non_assoc<D: DualNum<f64> + Copy>(
     (hs + hc + disp + dipole, [eta, eta_m1])
 }
 
-fn helmholtz_energy_density<D: DualNum<f64> + Copy>(
+fn helmholtz_energy_density<D: DualNum<Primitive = f64> + Copy>(
     parameters: &[D; 8],
     temperature: D,
     density: D,
@@ -119,17 +119,17 @@ fn helmholtz_energy_density<D: DualNum<f64> + Copy>(
     non_assoc + assoc
 }
 
-impl<D: DualNum<f64> + Copy> Residual<U1, D> for EPcpSaftPure<D, 8> {
+impl<D: DualNum<Primitive = f64> + Copy> Residual<U1, D> for EPcpSaftPure<D, 8> {
     fn components(&self) -> usize {
         1
     }
 
     type Real = EPcpSaftPure<f64, 8>;
-    type Lifted<D2: DualNum<f64, Inner = D> + Copy> = EPcpSaftPure<D2, 8>;
+    type Lifted<D2: DualNum<Primitive = f64, Inner = D> + Copy> = EPcpSaftPure<D2, 8>;
     fn re(&self) -> Self::Real {
         EPcpSaftPure(self.0.each_ref().map(D::re))
     }
-    fn lift<D2: DualNum<f64, Inner = D> + Copy>(&self) -> Self::Lifted<D2> {
+    fn lift<D2: DualNum<Primitive = f64, Inner = D> + Copy>(&self) -> Self::Lifted<D2> {
         EPcpSaftPure(self.0.each_ref().map(D2::from_inner))
     }
 
@@ -138,33 +138,26 @@ impl<D: DualNum<f64> + Copy> Residual<U1, D> for EPcpSaftPure<D, 8> {
         (m * sigma.powi(3) * FRAC_PI_6).recip() * MAX_ETA
     }
 
-    fn reduced_helmholtz_energy_density_contributions(
-        &self,
-        state: &StateHD<D, U1>,
-    ) -> Vec<(&'static str, D)> {
-        vec![(
-            "PC-SAFT (pure)",
-            self.reduced_residual_helmholtz_energy_density(state),
-        )]
-    }
-
-    fn reduced_residual_helmholtz_energy_density(&self, state: &StateHD<D, U1>) -> D {
+    fn for_each_contribution(&self, state: &StateHD<D, U1>, mut f: impl FnMut(&'static str, D)) {
         let density = state.partial_density.data.0[0][0];
-        helmholtz_energy_density(&self.0, state.temperature, density)
+        f(
+            "PC-SAFT (pure)",
+            helmholtz_energy_density(&self.0, state.temperature, density),
+        )
     }
 }
 
-impl<D: DualNum<f64> + Copy> Residual<U1, D> for EPcpSaftPure<D, 4> {
+impl<D: DualNum<Primitive = f64> + Copy> Residual<U1, D> for EPcpSaftPure<D, 4> {
     fn components(&self) -> usize {
         1
     }
 
     type Real = EPcpSaftPure<f64, 4>;
-    type Lifted<D2: DualNum<f64, Inner = D> + Copy> = EPcpSaftPure<D2, 4>;
+    type Lifted<D2: DualNum<Primitive = f64, Inner = D> + Copy> = EPcpSaftPure<D2, 4>;
     fn re(&self) -> Self::Real {
         EPcpSaftPure(self.0.each_ref().map(D::re))
     }
-    fn lift<D2: DualNum<f64, Inner = D> + Copy>(&self) -> Self::Lifted<D2> {
+    fn lift<D2: DualNum<Primitive = f64, Inner = D> + Copy>(&self) -> Self::Lifted<D2> {
         EPcpSaftPure(self.0.each_ref().map(D2::from_inner))
     }
 
@@ -173,25 +166,19 @@ impl<D: DualNum<f64> + Copy> Residual<U1, D> for EPcpSaftPure<D, 4> {
         (m * sigma.powi(3) * FRAC_PI_6).recip() * MAX_ETA
     }
 
-    fn reduced_helmholtz_energy_density_contributions(
-        &self,
-        state: &StateHD<D, U1>,
-    ) -> Vec<(&'static str, D)> {
-        vec![(
-            "PC-SAFT (pure, non-assoc)",
-            self.reduced_residual_helmholtz_energy_density(state),
-        )]
-    }
-
-    fn reduced_residual_helmholtz_energy_density(&self, state: &StateHD<D, U1>) -> D {
+    fn for_each_contribution(&self, state: &StateHD<D, U1>, mut f: impl FnMut(&'static str, D)) {
         let density = state.partial_density.data.0[0][0];
         let [m, sigma, epsilon_k, mu] = self.0;
-        helmholtz_energy_density_non_assoc(m, sigma, epsilon_k, mu, state.temperature, density).0
+        f(
+            "PC-SAFT (pure, non-assoc)",
+            helmholtz_energy_density_non_assoc(m, sigma, epsilon_k, mu, state.temperature, density)
+                .0,
+        )
     }
 }
 
 impl ParametersAD<U1> for EPcpSaftPure<f64, 4> {
-    fn build<D: DualNum<f64, Inner = f64> + Copy>(
+    fn build<D: DualNum<Primitive = f64, Inner = f64> + Copy>(
         mut f: impl FnMut(&'static str, bool) -> D,
     ) -> EPcpSaftPure<D, 4> {
         EPcpSaftPure([
@@ -204,7 +191,7 @@ impl ParametersAD<U1> for EPcpSaftPure<f64, 4> {
 }
 
 impl ParametersAD<U1> for EPcpSaftPure<f64, 8> {
-    fn build<D: DualNum<f64, Inner = f64> + Copy>(
+    fn build<D: DualNum<Primitive = f64, Inner = f64> + Copy>(
         mut f: impl FnMut(&'static str, bool) -> D,
     ) -> EPcpSaftPure<D, 8> {
         EPcpSaftPure([

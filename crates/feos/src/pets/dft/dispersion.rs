@@ -3,15 +3,12 @@ use crate::pets::Pets;
 use crate::pets::eos::dispersion::{A, B};
 use feos_core::FeosError;
 use feos_dft::{FunctionalContribution, WeightFunction, WeightFunctionInfo, WeightFunctionShape};
-use nalgebra::DVector;
 use ndarray::*;
 use num_dual::DualNum;
 use std::f64::consts::{FRAC_PI_6, PI};
 
 /// psi Parameter for DFT (Heier2018)
 const PSI_DFT: f64 = 1.21;
-/// psi Parameter for pDGT (not adjusted, yet)
-const PSI_PDGT: f64 = 1.21;
 
 #[derive(Clone)]
 pub struct AttractiveFunctional<'a> {
@@ -23,13 +20,13 @@ impl<'a> AttractiveFunctional<'a> {
         Self { parameters }
     }
 
-    fn att_weight_functions<N: DualNum<f64> + Copy>(
+    fn att_weight_functions<N: DualNum<Primitive = f64> + Copy>(
         &self,
         psi: f64,
         temperature: N,
     ) -> WeightFunctionInfo<N> {
         let d = self.parameters.hs_diameter(temperature);
-        WeightFunctionInfo::new(DVector::from_fn(d.len(), |i, _| i), false).add(
+        WeightFunctionInfo::new(d.len(), false).add(
             WeightFunction::new_scaled(d * N::from(psi), WeightFunctionShape::Theta),
             false,
         )
@@ -41,18 +38,14 @@ impl<'a> FunctionalContribution for AttractiveFunctional<'a> {
         "Attractive functional"
     }
 
-    fn weight_functions<N: DualNum<f64> + Copy>(&self, temperature: N) -> WeightFunctionInfo<N> {
-        self.att_weight_functions(PSI_DFT, temperature)
-    }
-
-    fn weight_functions_pdgt<N: DualNum<f64> + Copy>(
+    fn weight_functions<N: DualNum<Primitive = f64> + Copy>(
         &self,
         temperature: N,
     ) -> WeightFunctionInfo<N> {
-        self.att_weight_functions(PSI_PDGT, temperature)
+        self.att_weight_functions(PSI_DFT, temperature)
     }
 
-    fn helmholtz_energy_density<N: DualNum<f64> + Copy>(
+    fn helmholtz_energy_density<N: DualNum<Primitive = f64> + Copy>(
         &self,
         temperature: N,
         density: ArrayView2<N>,

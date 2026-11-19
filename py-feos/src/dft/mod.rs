@@ -1,6 +1,8 @@
 use crate::eos::{PyEquationOfState, parse_molefracs};
 use crate::ideal_gas::IdealGasModel;
 use crate::residual::ResidualModel;
+#[cfg(any(feature = "pcsaft", feature = "gc_pcsaft"))]
+use feos::association::AssociationVersion;
 use feos::hard_sphere::{FMTFunctional, FMTVersion};
 use feos_core::{EquationOfState, ResidualDyn};
 use feos_dft::Geometry;
@@ -15,11 +17,10 @@ mod profile;
 mod solvation;
 mod solver;
 
-pub(crate) use adsorption::{PyAdsorption1D, PyExternalPotential, PyPore1D, PyPore2D};
-// 3D pore / adsorption bindings wrap rayon-gated feos_dft types.
-#[cfg(feature = "rayon")]
-pub(crate) use adsorption::{PyAdsorption3D, PyPore3D};
-pub(crate) use interface::{PyPlanarInterface, PySurfaceTensionDiagram};
+pub(crate) use adsorption::{
+    PyAdsorption, PyExternalPotential, PyGrid, PyPore1D, PyPoreProfile, PyPoreSpecification,
+};
+pub(crate) use interface::{PyInterface, PySurfaceTensionDiagram};
 pub(crate) use solvation::PyPairCorrelation;
 #[cfg(feature = "rayon")]
 pub(crate) use solvation::PySolvationProfile;
@@ -86,6 +87,41 @@ impl From<PyFMTVersion> for FMTVersion {
     }
 }
 
+/// Different versions of the association functional.
+#[cfg(any(feature = "pcsaft", feature = "gc_pcsaft"))]
+#[derive(Clone, Copy, PartialEq)]
+#[pyclass(name = "AssociationVersion", eq, eq_int, from_py_object)]
+pub enum PyAssociationVersion {
+    /// Site densities and contact values from FMT weighted densities ([Yu and Wu, 2002](https://doi.org/10.1063/1.1463435))
+    YuWu,
+    /// Bulk association at weighted densities averaged over a sphere with the segment diameter ([Camacho Vergara et al., 2020](https://doi.org/10.1080/00268976.2020.1725668))
+    Wda,
+    /// Inhomogeneous TPT1 with local site densities and a contact shell as association kernel ([Bymaster and Chapman, 2010](https://doi.org/10.1021/jp102677m))
+    ISaft,
+}
+
+#[cfg(any(feature = "pcsaft", feature = "gc_pcsaft"))]
+impl From<AssociationVersion> for PyAssociationVersion {
+    fn from(association_version: AssociationVersion) -> Self {
+        match association_version {
+            AssociationVersion::YuWu => PyAssociationVersion::YuWu,
+            AssociationVersion::Wda => PyAssociationVersion::Wda,
+            AssociationVersion::ISaft => PyAssociationVersion::ISaft,
+        }
+    }
+}
+
+#[cfg(any(feature = "pcsaft", feature = "gc_pcsaft"))]
+impl From<PyAssociationVersion> for AssociationVersion {
+    fn from(association_version: PyAssociationVersion) -> Self {
+        match association_version {
+            PyAssociationVersion::YuWu => AssociationVersion::YuWu,
+            PyAssociationVersion::Wda => AssociationVersion::Wda,
+            PyAssociationVersion::ISaft => AssociationVersion::ISaft,
+        }
+    }
+}
+
 /// Collection of Helmholtz energy functionals.
 #[pyclass(name = "HelmholtzEnergyFunctional", from_py_object)]
 #[derive(Clone)]
@@ -117,24 +153,3 @@ impl PyHelmholtzEnergyFunctional {
         ))))
     }
 }
-
-// #[pymodule]
-// pub fn dft(m: &Bound<'_, PyModule>) -> PyResult<()> {
-//     m.add_class::<PyFMTVersion>()?;
-//     m.add_class::<PyHelmholtzEnergyFunctional>()?;
-
-//     m.add_class::<PyPlanarInterface>()?;
-//     m.add_class::<PyGeometry>()?;
-//     m.add_class::<PyPore1D>()?;
-//     m.add_class::<PyPore2D>()?;
-//     m.add_class::<PyPore3D>()?;
-//     m.add_class::<PyPairCorrelation>()?;
-//     m.add_class::<PyExternalPotential>()?;
-//     m.add_class::<PyAdsorption1D>()?;
-//     m.add_class::<PyAdsorption3D>()?;
-//     m.add_class::<PySurfaceTensionDiagram>()?;
-//     m.add_class::<PyDFTSolver>()?;
-//     m.add_class::<PySolvationProfile>()?;
-
-//     Ok(())
-// }

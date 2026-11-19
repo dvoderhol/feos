@@ -12,7 +12,7 @@ impl Ionic {
     /// a / (kT V) = -kappa lambda_B / 3 sum_i rho_i z_i^2 chi_i,
     /// kappa^2 = 4 pi lambda_B sum_i rho_i z_i^2,
     /// chi_i = 3 / (kappa d_i)^3 [ln(1 + kappa d_i) - 2 (1 + kappa d_i) + (1 + kappa d_i)^2 / 2 + 3 / 2].
-    pub fn helmholtz_energy_density<D: DualNum<f64> + Copy>(
+    pub fn helmholtz_energy_density<D: DualNum<Primitive = f64> + Copy>(
         &self,
         parameters: &EPcpSaftPars<D>,
         state: &StateHD<D>,
@@ -44,7 +44,12 @@ impl Ionic {
 /// Reduced Helmholtz energy density of the Debye-Hückel term for ions with densities `rho` (Å⁻³), charges `z`,
 /// diameters `d` (Å) and Bjerrum length `lb` (Å):
 /// a / (kT V) = -κ λ_B / 3 Σ_i ρ_i z_i² χ(κ d_i), κ² = 4π λ_B Σ_i ρ_i z_i².
-pub fn debye_hueckel<D: DualNum<f64> + Copy>(rho: &[D], z: &[f64], d: &[D], lb: D) -> D {
+pub fn debye_hueckel<D: DualNum<Primitive = f64> + Copy>(
+    rho: &[D],
+    z: &[f64],
+    d: &[D],
+    lb: D,
+) -> D {
     let sum_rho_z2 = rho
         .iter()
         .zip(z)
@@ -68,7 +73,7 @@ pub fn debye_hueckel<D: DualNum<f64> + Copy>(rho: &[D], z: &[f64], d: &[D], lb: 
 /// or a test particle at zero density):
 /// β μ_k = -λ_B κ q² χ(κ σ) / 3 - 2π λ_B² q² / (3 κ) Σ_i ρ_i z_i² [χ(κ d_i) + κ d_i χ'(κ d_i)],
 /// with the limit -λ_B κ q² / 2 for κ d -> 0 (Debye-Hückel limiting law).
-pub fn debye_hueckel_chemical_potential<D: DualNum<f64> + Copy>(
+pub fn debye_hueckel_chemical_potential<D: DualNum<Primitive = f64> + Copy>(
     q: f64,
     sigma: D,
     rho: &[D],
@@ -105,7 +110,7 @@ const CHI_SERIES_TERMS: usize = 52;
 /// The bracket equals ln(1 + x) - x + x^2 / 2 = x^3 / 3 - x^4 / 4 + ... and is the difference of
 /// terms of order 1, so its relative rounding error grows as 1 / x^3. For x < 0.5 the series
 /// chi(x) = sum_k 3 (-x)^k / (k + 3) is used instead.
-fn chi<D: DualNum<f64> + Copy>(x: D) -> D {
+fn chi<D: DualNum<Primitive = f64> + Copy>(x: D) -> D {
     if x.re() < CHI_SERIES_LIMIT {
         chi_series(x)
     } else {
@@ -113,13 +118,13 @@ fn chi<D: DualNum<f64> + Copy>(x: D) -> D {
     }
 }
 
-fn chi_series<D: DualNum<f64> + Copy>(x: D) -> D {
+fn chi_series<D: DualNum<Primitive = f64> + Copy>(x: D) -> D {
     (0..CHI_SERIES_TERMS)
         .rev()
         .fold(D::zero(), |s, k| -s * x + 3.0 / (k + 3) as f64)
 }
 
-fn chi_closed_form<D: DualNum<f64> + Copy>(x: D) -> D {
+fn chi_closed_form<D: DualNum<Primitive = f64> + Copy>(x: D) -> D {
     x.powi(3).recip() * ((x + 1.0).ln() - (x + 1.0) * 2.0 + (x + 1.0).powi(2) * 0.5 + 1.5) * 3.0
 }
 

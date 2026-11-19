@@ -22,7 +22,7 @@ impl Association {
     }
 
     /// Association strength matrix: g_HS(d_ij) (exp(eps_AB/kT) - 1) kappa_AB (sigma_i sigma_j)^1.5
-    fn association_strength<D: DualNum<f64> + Copy>(
+    fn association_strength<D: DualNum<Primitive = f64> + Copy>(
         p: &EPcpSaftPars<D>,
         state: &StateHD<D>,
         diameter: &DVector<D>,
@@ -54,7 +54,7 @@ impl Association {
         delta
     }
 
-    pub fn helmholtz_energy_density<D: DualNum<f64> + Copy>(
+    pub fn helmholtz_energy_density<D: DualNum<Primitive = f64> + Copy>(
         &self,
         p: &EPcpSaftPars<D>,
         a: &AssociationParameters<EPcpSaftAssociationRecord>,
@@ -90,7 +90,7 @@ impl Association {
         }
     }
 
-    fn helmholtz_energy_density_ab_analytic<A, D: DualNum<f64> + Copy>(
+    fn helmholtz_energy_density_ab_analytic<A, D: DualNum<Primitive = f64> + Copy>(
         a: &AssociationParameters<A>,
         state: &StateHD<D>,
         delta: D,
@@ -116,7 +116,7 @@ impl Association {
         rhoa * (xa.ln() - xa * 0.5 + 0.5) + rhob * (xb.ln() - xb * 0.5 + 0.5)
     }
 
-    fn helmholtz_energy_density_cc_analytic<A, D: DualNum<f64> + Copy>(
+    fn helmholtz_energy_density_cc_analytic<A, D: DualNum<Primitive = f64> + Copy>(
         a: &AssociationParameters<A>,
         state: &StateHD<D>,
         delta: D,
@@ -131,7 +131,7 @@ impl Association {
         rhoc * (xc.ln() - xc * 0.5 + 0.5)
     }
 
-    fn helmholtz_energy_density_cross_association<D: DualNum<f64> + Copy>(
+    fn helmholtz_energy_density_cross_association<D: DualNum<Primitive = f64> + Copy>(
         &self,
         rho: &DVector<D>,
         delta_ab: &DMatrix<D>,
@@ -168,7 +168,7 @@ impl Association {
     }
 }
 
-fn newton_step_cross_association<D: DualNum<f64> + Copy>(
+fn newton_step_cross_association<D: DualNum<Primitive = f64> + Copy>(
     x: &mut DVector<D>,
     delta_ab: &DMatrix<D>,
     delta_cc: &DMatrix<D>,

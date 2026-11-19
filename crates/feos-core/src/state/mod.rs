@@ -64,7 +64,7 @@ impl DensityInitialization {
 /// Properties are stored as generalized (hyper) dual numbers which allows
 /// for automatic differentiation.
 #[derive(Clone, Debug)]
-pub struct StateHD<D: DualNum<f64> + Copy, N: Dim = Dyn>
+pub struct StateHD<D: DualNum<Primitive = f64> + Copy, N: Dim = Dyn>
 where
     DefaultAllocator: Allocator<N>,
 {
@@ -76,23 +76,22 @@ where
     pub partial_density: OVector<D, N>,
 }
 
-impl<N: Dim, D: DualNum<f64> + Copy> StateHD<D, N>
+impl<N: Dim, D: DualNum<Primitive = f64> + Copy> StateHD<D, N>
 where
     DefaultAllocator: Allocator<N>,
 {
     /// Create a new `StateHD` for given temperature, volume and composition.
     pub fn new(temperature: D, volume: D, moles: &OVector<D, N>) -> Self {
-        Self::new_density(temperature, &(moles / volume))
+        Self::new_density(temperature, moles / volume)
     }
 
     /// Create a new `StateHD` for given temperature and partial densities
-    pub fn new_density(temperature: D, partial_density: &OVector<D, N>) -> Self {
-        let molefracs = partial_density / partial_density.sum();
-
+    pub fn new_density(temperature: D, partial_density: OVector<D, N>) -> Self {
+        let molefracs = &partial_density / partial_density.sum();
         Self {
             temperature,
             molefracs,
-            partial_density: partial_density.clone(),
+            partial_density,
         }
     }
 
@@ -137,7 +136,7 @@ where
 /// + [Stability analysis](#stability-analysis)
 /// + [Flash calculations](#flash-calculations)
 #[derive(Debug, Clone)]
-pub struct State<E, N: Dim = Dyn, D: DualNum<f64> + Copy = f64>
+pub struct State<E, N: Dim = Dyn, D: DualNum<Primitive = f64> + Copy = f64>
 where
     DefaultAllocator: Allocator<N>,
 {
@@ -157,7 +156,7 @@ where
     cache: Cache<D, N>,
 }
 
-impl<E, N: Dim, D: DualNum<f64> + Copy> State<E, N, D>
+impl<E, N: Dim, D: DualNum<Primitive = f64> + Copy> State<E, N, D>
 where
     DefaultAllocator: Allocator<N>,
 {
@@ -192,7 +191,7 @@ where
     }
 }
 
-impl<E: Residual<N, D>, N: Dim, D: DualNum<f64> + Copy> fmt::Display for State<E, N, D>
+impl<E: Residual<N, D>, N: Dim, D: DualNum<Primitive = f64> + Copy> fmt::Display for State<E, N, D>
 where
     DefaultAllocator: Allocator<N>,
 {
@@ -216,7 +215,7 @@ where
     }
 }
 
-impl<E: Residual<N, D>, N: Dim, D: DualNum<f64> + Copy> State<E, N, D>
+impl<E: Residual<N, D>, N: Dim, D: DualNum<Primitive = f64> + Copy> State<E, N, D>
 where
     DefaultAllocator: Allocator<N>,
 {
@@ -403,7 +402,7 @@ where
     }
 }
 
-impl<E: Total<N, D>, N: Gradients, D: DualNum<f64> + Copy> State<E, N, D>
+impl<E: Total<N, D>, N: Gradients, D: DualNum<Primitive = f64> + Copy> State<E, N, D>
 where
     DefaultAllocator: Allocator<N>,
 {
@@ -600,7 +599,7 @@ fn is_close<U: Copy>(
     (x - y).abs() <= atol + rtol * y.abs()
 }
 
-fn newton<E: Residual<N, D>, N: Dim, D: DualNum<f64> + Copy, F, X: Copy, Y>(
+fn newton<E: Residual<N, D>, N: Dim, D: DualNum<Primitive = f64> + Copy, F, X: Copy, Y>(
     mut x0: Quantity<D, X>,
     mut f: F,
     atol: Quantity<f64, X>,
@@ -620,16 +619,15 @@ where
     let maxiter = 50;
 
     for _ in 0..maxiter {
-        let (fx, dfx, mut state) = f(x0)?;
+        let (fx, dfx, _) = f(x0)?;
         let x = x0 - fx / dfx;
         if is_close(x.re(), x0.re(), atol, rtol) {
             // Ensure that at least NDERIV iterations are performed (for implicit AD)
             for _ in 0..D::NDERIV {
-                let (fx, dfx, s) = f(x0)?;
+                let (fx, dfx, _) = f(x0)?;
                 x0 -= fx / dfx;
-                state = s;
             }
-            return Ok(state);
+            return Ok(f(x0)?.2);
         }
         x0 = x;
     }
@@ -644,7 +642,7 @@ where
 ///
 /// There is no validation of the physical state, e.g.
 /// if resulting densities are below maximum packing fraction.
-fn validate<N: Dim, D: DualNum<f64>>(
+fn validate<N: Dim, D: DualNum<Primitive = f64>>(
     temperature: Temperature<D>,
     density: Density<D>,
     molefracs: &OVector<D, N>,

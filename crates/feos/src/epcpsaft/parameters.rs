@@ -404,7 +404,7 @@ impl EPcpSaftPars {
     }
 }
 
-impl<D: DualNum<f64> + Copy> EPcpSaftPars<D> {
+impl<D: DualNum<Primitive = f64> + Copy> EPcpSaftPars<D> {
     /// Parameters from the adjustable parameters; the structure is taken from `structure`.
     #[expect(clippy::too_many_arguments)]
     fn derive<D0>(
@@ -480,7 +480,10 @@ impl<D: DualNum<f64> + Copy> EPcpSaftPars<D> {
     }
 
     /// Parameters with all adjustable parameters mapped by `f`; derived parameters are recomputed.
-    pub fn map<D2: DualNum<f64> + Copy>(&self, f: impl Fn(D) -> D2) -> EPcpSaftPars<D2> {
+    pub fn map<D2: DualNum<Primitive = f64> + Copy>(
+        &self,
+        f: impl Fn(D) -> D2,
+    ) -> EPcpSaftPars<D2> {
         let v = |x: &DVector<D>| x.map(&f);
         EPcpSaftPars::derive(
             v(&self.m),

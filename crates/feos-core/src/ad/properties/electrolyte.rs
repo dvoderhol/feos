@@ -114,7 +114,7 @@ pub struct ElectrolyteProperties<D> {
 }
 
 /// Equilibrium state of the solution and the pure solvent.
-struct Equilibrium<E, D: DualNum<f64> + Copy> {
+struct Equilibrium<E, D: DualNum<Primitive = f64> + Copy> {
     solution: State<E, Dyn, D>,
     reference: State<E, Dyn, D>,
     moles: DVector<D>,
@@ -128,7 +128,7 @@ const TOL: f64 = 1e-10;
 const STEP_TOL: f64 = 1e-12;
 const DT_HEAT_CAPACITY: f64 = 0.05;
 
-impl<D: DualNum<f64, Inner = f64> + Copy> ElectrolyteProperties<D> {
+impl<D: DualNum<Primitive = f64, Inner = f64> + Copy> ElectrolyteProperties<D> {
     /// Properties of the solution with the amounts `moles` and the solvent `solvent` at
     /// `temperature` and `pressure`.
     ///
@@ -234,7 +234,7 @@ impl<D: DualNum<f64, Inner = f64> + Copy> ElectrolyteProperties<D> {
 /// The density iteration converges to an absolute pressure tolerance, which at low pressures (e.g. vapor
 /// pressures of solutions) is a relative deviation of $p_\mathrm{state}$ from $p$ that enters $\ln\varphi_i$
 /// directly; the fugacity of the state does not contain it.
-fn ln_phi_at<E: Residual<Dyn, D>, D: DualNum<f64, Inner = f64> + Copy>(
+fn ln_phi_at<E: Residual<Dyn, D>, D: DualNum<Primitive = f64, Inner = f64> + Copy>(
     state: &State<E, Dyn, D>,
     p: f64,
 ) -> DVector<D> {
@@ -244,7 +244,7 @@ fn ln_phi_at<E: Residual<Dyn, D>, D: DualNum<f64, Inner = f64> + Copy>(
 
 /// Residual partial molar enthalpies (J/mol) in the reference state: pure solvent and solutes at
 /// infinite dilution, $\bar h_k^\mathrm{res} = -RT^2(\partial\ln\varphi_k/\partial T)_{p,n}$.
-fn reference_enthalpies<E: Residual<Dyn, D>, D: DualNum<f64, Inner = f64> + Copy>(
+fn reference_enthalpies<E: Residual<Dyn, D>, D: DualNum<Primitive = f64, Inner = f64> + Copy>(
     reference: &State<E, Dyn, D>,
     t: f64,
 ) -> DVector<D> {
@@ -259,7 +259,7 @@ fn reference_enthalpies<E: Residual<Dyn, D>, D: DualNum<f64, Inner = f64> + Copy
 /// started from the density of the pure solvent `rho_solvent` (reduced) scaled by the ratio of the
 /// total amount to the amount of solvent, and from decreasing fractions of that density (for
 /// concentrated solutions of large ions the liquid density can be about 0.3 of this estimate).
-fn liquid<E: Residual<Dyn, D>, D: DualNum<f64, Inner = f64> + Copy>(
+fn liquid<E: Residual<Dyn, D>, D: DualNum<Primitive = f64, Inner = f64> + Copy>(
     eos: &E,
     t: f64,
     p: f64,
@@ -290,7 +290,7 @@ fn liquid<E: Residual<Dyn, D>, D: DualNum<f64, Inner = f64> + Copy>(
 /// J_rq = sum_ij nu_ri nu_qj (delta_ij / n_i + (N d ln phi_i / d n_j - 1) / N). The extents are
 /// solved with f64 (first for the ideal solution, then with the equation of state); a final
 /// Newton step with the generic number type D gives their derivatives (implicit function theorem).
-fn equilibrium<E: Residual<Dyn, D>, D: DualNum<f64, Inner = f64> + Copy>(
+fn equilibrium<E: Residual<Dyn, D>, D: DualNum<Primitive = f64, Inner = f64> + Copy>(
     eos: &E,
     t: f64,
     p: f64,

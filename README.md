@@ -121,7 +121,7 @@ pip install feos
 If there is no compiled package for your system available from PyPI and you have a Rust compiler installed, you can instead build the python package from source using
 
 ```
-pip install git+https://github.com/feos-org/feos
+pip install "git+https://github.com/feos-org/feos#subdirectory=py-feos"
 ```
 
 This command builds the package without link-time optimization (LTO) that can be used to increase the performance further.
@@ -154,7 +154,7 @@ maturin build --profile="release-lto"
 ```
 
 which will use the `wheel` feature collection specified in the `pyproject.toml` file. 
-The `emscripten_wheel` collection provides the same models and AD support for Pyodide while omitting incompatible features (such as Rayon, SQLite, and the Rayon-dependent 3D DFT classes).
+The `emscripten_wheel` collection provides the same models and AD support for Pyodide while omitting incompatible features (such as Rayon and SQLite).
 Use the following command to build a wheel with specific features:
 
 ```

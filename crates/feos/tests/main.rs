@@ -1,3 +1,5 @@
+#[cfg(feature = "epcpsaft")]
+mod epcpsaft;
 #[cfg(feature = "gc_pcsaft")]
 mod gc_pcsaft;
 #[cfg(feature = "pcsaft")]

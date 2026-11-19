@@ -43,7 +43,7 @@ pub struct BiMsaInput<'a, D> {
     pub constant: PairingConstant,
 }
 
-impl<D: DualNum<f64> + Copy> BiMsaInput<'_, D> {
+impl<D: DualNum<Primitive = f64> + Copy> BiMsaInput<'_, D> {
     /// e^f_ij K_ij g_ij (Γ-independent part of Δ_ij)
     fn prefactor(&self) -> DMatrix<D> {
         let n = self.rho.len();
@@ -61,7 +61,7 @@ impl<D: DualNum<f64> + Copy> BiMsaInput<'_, D> {
 }
 
 /// Δ_ij(Γ) for the prefactors `pre` (generic in the number type of Γ).
-fn strength<T: DualNum<f64> + Copy>(
+fn strength<T: DualNum<Primitive = f64> + Copy>(
     gamma: T,
     rho: &[T],
     z: &[f64],
@@ -86,7 +86,7 @@ fn strength<T: DualNum<f64> + Copy>(
 
 /// F(Γ, X) / (kT V) (generic in the number type).
 #[expect(clippy::too_many_arguments)]
-fn functional<T: DualNum<f64> + Copy>(
+fn functional<T: DualNum<Primitive = f64> + Copy>(
     gamma: T,
     x: &[T],
     rho: &[T],
@@ -110,7 +110,7 @@ fn functional<T: DualNum<f64> + Copy>(
 
 /// ∂F/∂Γ at fixed X (in the number type T).
 #[expect(clippy::too_many_arguments)]
-fn dfunctional_dgamma<T: DualNum<f64> + Copy>(
+fn dfunctional_dgamma<T: DualNum<Primitive = f64> + Copy>(
     gamma: T,
     x: &[T],
     rho: &[T],
@@ -120,7 +120,7 @@ fn dfunctional_dgamma<T: DualNum<f64> + Copy>(
     lb: T,
     pre: &DMatrix<T>,
 ) -> T {
-    let l = |v: T| Dual::<T, f64>::from_re(v);
+    let l = |v: T| Dual::<T>::from_re(v);
     let rho_l: Vec<_> = rho.iter().map(|&v| l(v)).collect();
     let d_l: Vec<_> = d.iter().map(|&v| l(v)).collect();
     let x_l: Vec<_> = x.iter().map(|&v| l(v)).collect();
@@ -139,7 +139,7 @@ fn dfunctional_dgamma<T: DualNum<f64> + Copy>(
 
 /// Residuals of the stationarity conditions: [∂F/∂Γ, X_i (1 + Σ_j ρ_j X_j Δ_ij(Γ)) - 1].
 #[expect(clippy::too_many_arguments)]
-fn residuals<T: DualNum<f64> + Copy>(
+fn residuals<T: DualNum<Primitive = f64> + Copy>(
     gamma: T,
     x: &[T],
     rho: &[T],
@@ -161,7 +161,7 @@ fn residuals<T: DualNum<f64> + Copy>(
 }
 
 /// Reduced Helmholtz energy density of the BiMSA term. Returns (a / (kT V), Γ, fractions of non-paired ions X).
-pub fn bimsa<D: DualNum<f64> + Copy>(input: &BiMsaInput<D>) -> (D, D, DVector<D>) {
+pub fn bimsa<D: DualNum<Primitive = f64> + Copy>(input: &BiMsaInput<D>) -> (D, D, DVector<D>) {
     let BiMsaInput {
         rho,
         z,

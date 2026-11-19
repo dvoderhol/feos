@@ -83,25 +83,26 @@ impl ResidualDyn for MultiParameter {
         1
     }
 
-    fn compute_max_density<D: DualNum<f64> + Copy>(&self, _: &DVector<D>) -> D {
+    fn compute_max_density<D: DualNum<Primitive = f64> + Copy>(&self, _: &DVector<D>) -> D {
         // Not sure what value works well here. This one is based on rho_c = 0.31*rho_max.
         D::from(6.02214076e-7 * self.rhoc / 0.31)
     }
 
-    fn reduced_helmholtz_energy_density_contributions<D: DualNum<f64> + Copy>(
+    fn for_each_contribution<D: DualNum<Primitive = f64> + Copy>(
         &self,
         state: &StateHD<D>,
-    ) -> Vec<(&'static str, D)> {
+        mut f: impl FnMut(&'static str, D),
+    ) {
         let rho = state.partial_density.sum();
         let delta = rho / (6.02214076e-7 * self.rhoc);
         let tau = state.temperature.recip() * self.tc;
-        vec![(
+        f(
             "Multiparameter",
             self.terms
                 .iter()
                 .map(|r| r.evaluate(delta, tau) * rho)
                 .sum(),
-        )]
+        )
     }
 }
 
@@ -118,7 +119,7 @@ impl Subset for MultiParameter {
 }
 
 impl IdealGas for MultiParameterIdealGas {
-    fn ln_lambda3<D: DualNum<f64> + Copy>(&self, temperature: D) -> D {
+    fn ln_lambda3<D: DualNum<Primitive = f64> + Copy>(&self, temperature: D) -> D {
         let tau = temperature.recip() * self.tc;
         // bit of a hack to convert from phi^0 into ln Lambda^3
         let delta = D::from(E / (6.02214076e-7 * self.rhoc));
@@ -165,7 +166,7 @@ mod test {
                 eos.terms
                     .iter()
                     .map(|f| f.evaluate(delta, tau))
-                    .sum::<Dual2Vec<f64, f64, U2>>()
+                    .sum::<Dual2Vec<f64, U2>>()
             },
             &SVector::from([delta, tau]),
         );
@@ -191,7 +192,7 @@ mod test {
                 eos.terms
                     .iter()
                     .map(|f| f.evaluate(delta, tau))
-                    .sum::<Dual2Vec<f64, f64, U2>>()
+                    .sum::<Dual2Vec<f64, U2>>()
             },
             &SVector::from([delta, tau]),
         );
@@ -218,7 +219,7 @@ mod test {
                     .terms
                     .iter()
                     .map(|r| r.evaluate(delta, tau))
-                    .sum::<Dual2Vec<f64, f64, U2>>()
+                    .sum::<Dual2Vec<f64, U2>>()
             },
             &SVector::from([delta, tau]),
         );
@@ -245,7 +246,7 @@ mod test {
                     .terms
                     .iter()
                     .map(|r| r.evaluate(delta, tau))
-                    .sum::<Dual2Vec<f64, f64, U2>>()
+                    .sum::<Dual2Vec<f64, U2>>()
             },
             &SVector::from([delta, tau]),
         );

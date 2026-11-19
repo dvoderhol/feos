@@ -77,7 +77,7 @@ impl ResidualDyn for GcPcSaft {
         self.parameters.molar_weight.len()
     }
 
-    fn compute_max_density<D: DualNum<f64> + Copy>(&self, molefracs: &DVector<D>) -> D {
+    fn compute_max_density<D: DualNum<Primitive = f64> + Copy>(&self, molefracs: &DVector<D>) -> D {
         let p = &self.params;
         let molefracs_segments = DVector::from(p.component_index.clone()).map(|i| molefracs[i]);
         (p.m.component_mul(&p.sigma.map(|v| v.powi(3)))
@@ -88,33 +88,33 @@ impl ResidualDyn for GcPcSaft {
             * self.options.max_eta
     }
 
-    fn reduced_helmholtz_energy_density_contributions<D: DualNum<f64> + Copy>(
+    fn for_each_contribution<D: DualNum<Primitive = f64> + Copy>(
         &self,
         state: &feos_core::StateHD<D>,
-    ) -> Vec<(&'static str, D)> {
-        let mut v = Vec::with_capacity(7);
+        mut f: impl FnMut(&'static str, D),
+    ) {
         let d = self.params.hs_diameter(state.temperature);
 
-        v.push((
+        f(
             "Hard Sphere",
             HardSphere.helmholtz_energy_density(&self.params, state),
-        ));
-        v.push((
+        );
+        f(
             "Hard Chain",
             HardChain.helmholtz_energy_density(&self.params, state),
-        ));
-        v.push((
+        );
+        f(
             "Dispersion",
             Dispersion.helmholtz_energy_density(&self.params, state),
-        ));
+        );
         if let Some(dipole) = self.dipole.as_ref() {
-            v.push((
+            f(
                 "Dipole",
                 dipole.helmholtz_energy_density(&self.params, state),
-            ))
+            )
         }
         if let Some(association) = self.association.as_ref() {
-            v.push((
+            f(
                 "Association",
                 association.helmholtz_energy_density(
                     &self.params,
@@ -122,9 +122,8 @@ impl ResidualDyn for GcPcSaft {
                     state,
                     &d,
                 ),
-            ))
+            )
         }
-        v
     }
 }
 

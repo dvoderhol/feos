@@ -12,7 +12,7 @@ type InvP<T> = Quantity<T, <_Pressure as Neg>::Output>;
 type POverT<T> = Quantity<T, <_Pressure as Sub<_Temperature>>::Output>;
 
 /// # State properties
-impl<E: Residual<N, D>, N: Gradients, D: DualNum<f64> + Copy> State<E, N, D>
+impl<E: Residual<N, D>, N: Gradients, D: DualNum<Primitive = f64> + Copy> State<E, N, D>
 where
     DefaultAllocator: Allocator<N>,
 {
@@ -449,7 +449,7 @@ impl<E: Residual + Subset> State<E> {
             .into_iter()
             .zip(&vle.vapor().molefracs)
             .for_each(|(i, &y)| molefracs_vapor[i] = y);
-        let vapor = State::new(eos, temperature, vle.vapor().density, molefracs.clone())?;
+        let vapor = State::new(eos, temperature, vle.vapor().density, molefracs_vapor)?;
 
         // Determine the Henry's law coefficients and return only those of the Henry components
         let p = vle.vapor().pressure(Contributions::Total).into_reduced();
@@ -473,14 +473,15 @@ impl<E: Residual> State<E> {
     /// Thermodynamic factor: $\Gamma_{ij}=\delta_{ij}+x_i\left(\frac{\partial\ln\varphi_i}{\partial x_j}\right)_{T,p,\Sigma}$
     pub fn thermodynamic_factor(&self) -> DMatrix<f64> {
         let dln_phi_dnj = self.n_dln_phi_dnj();
+        let x = &self.molefracs;
         let n = self.eos.components() - 1;
         DMatrix::from_fn(n, n, |i, j| {
-            dln_phi_dnj[(i, j)] - dln_phi_dnj[(i, n)] + if i == j { 1.0 } else { 0.0 }
+            x[i] * (dln_phi_dnj[(i, j)] - dln_phi_dnj[(i, n)]) + if i == j { 1.0 } else { 0.0 }
         })
     }
 }
 
-impl<E: Residual<N, D>, N: Gradients, D: DualNum<f64> + Copy> State<E, N, D>
+impl<E: Residual<N, D>, N: Gradients, D: DualNum<Primitive = f64> + Copy> State<E, N, D>
 where
     DefaultAllocator: Allocator<N>,
 {
@@ -585,7 +586,7 @@ where
     }
 }
 
-impl<E: Residual<N, D> + Molarweight<N, D>, N: Gradients, D: DualNum<f64> + Copy> State<E, N, D>
+impl<E: Residual<N, D> + Molarweight<N, D>, N: Gradients, D: DualNum<Primitive = f64> + Copy> State<E, N, D>
 where
     DefaultAllocator: Allocator<N>,
 {
@@ -628,7 +629,7 @@ where
 ///
 /// These properties are available for equations of state
 /// that implement the [EntropyScaling] trait.
-impl<E: Residual<N, D> + EntropyScaling<N, D>, N: Gradients, D: DualNum<f64> + Copy> State<E, N, D>
+impl<E: Residual<N, D> + EntropyScaling<N, D>, N: Gradients, D: DualNum<Primitive = f64> + Copy> State<E, N, D>
 where
     DefaultAllocator: Allocator<N>,
 {

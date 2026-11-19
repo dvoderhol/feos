@@ -164,57 +164,74 @@ impl EPcpSaft {
     }
 
     /// Relative permittivity of the mixture; `None` if a component has no permittivity record.
-    pub fn permittivity<D: DualNum<f64> + Copy>(&self, state: &StateHD<D>) -> Option<D> {
+    pub fn permittivity<D: DualNum<Primitive = f64> + Copy>(
+        &self,
+        state: &StateHD<D>,
+    ) -> Option<D> {
         self.params.map(D::from).permittivity(state)
     }
 
     /// Diameters used in the Born term: hard-sphere diameter (or σ, option `born_diameter`) plus
     /// `born_delta_cation` (cations) or `born_delta_anion` (anions).
-    pub fn born_diameter<D: DualNum<f64> + Copy>(&self, temperature: D) -> DVector<D> {
+    pub fn born_diameter<D: DualNum<Primitive = f64> + Copy>(&self, temperature: D) -> DVector<D> {
         self.params.map(D::from).born_diameter(temperature)
     }
 
-    /// Reduced Helmholtz energy densities of all contributions for parameters `p`
-    /// (the parameters of this model, or the same parameters as dual numbers).
+    /// Passes the reduced Helmholtz energy density of each contribution to `f`, for parameters
+    /// `p` (the parameters of this model, or the same parameters as dual numbers).
     /// `hard_chain`: evaluate the hard-chain term (also needed if all m = 1 but derivatives
     /// with respect to m are calculated).
-    pub(crate) fn contributions<D: DualNum<f64> + Copy>(
+    pub(crate) fn for_each_contribution_with<D: DualNum<Primitive = f64> + Copy>(
         &self,
         p: &EPcpSaftPars<D>,
         state: &StateHD<D>,
         hard_chain: bool,
-    ) -> Vec<(&'static str, D)> {
-        let mut v = Vec::with_capacity(9);
-        let d = p.diameter(state.temperature);
-
-        v.push(("Hard Sphere", hard_sphere(p, state)));
+        mut f: impl FnMut(&'static str, D),
+    ) {
+        let (a_hs, zeta, d) = hard_sphere_and_properties(p, state);
+        f("Hard Sphere", a_hs);
         if hard_chain {
-            v.push(("Hard Chain", HardChain.helmholtz_energy_density(p, state)))
+            f(
+                "Hard Chain",
+                HardChain.helmholtz_energy_density(p, state, &d, zeta),
+            )
         }
-        v.push(("Dispersion", Dispersion.helmholtz_energy_density(p, state)));
+        f(
+            "Dispersion",
+            Dispersion.helmholtz_energy_density(p, state, zeta[3]),
+        );
+        // the polar terms are set up from `p`, which can carry derivatives with respect to the
+        // model parameters (pcsaft precomputes them in the constructor)
         if self.dipole {
-            v.push(("Dipole", Dipole.helmholtz_energy_density(p, state)))
+            f(
+                "Dipole",
+                Dipole::new(p).helmholtz_energy_density(p, state, zeta[3]),
+            )
         }
         if self.quadrupole {
-            v.push(("Quadrupole", Quadrupole.helmholtz_energy_density(p, state)))
+            f(
+                "Quadrupole",
+                Quadrupole::new(p).helmholtz_energy_density(p, state, zeta[3]),
+            )
         }
         if self.dipole_quadrupole {
-            v.push((
+            f(
                 "DipoleQuadrupole",
-                DipoleQuadrupole.helmholtz_energy_density(p, state, self.options.dq_variant),
-            ))
+                DipoleQuadrupole::new(p, self.options.dq_variant)
+                    .helmholtz_energy_density(p, state, zeta[3]),
+            )
         }
         if let Some(association) = self.association.as_ref() {
-            v.push((
+            f(
                 "Association",
                 association.helmholtz_energy_density(p, &self.parameters.association, state, &d),
-            ))
+            )
         }
         if self.ionic {
             let permittivity = p.permittivity(state).unwrap();
             let bjerrum_length = p.bjerrum_length(state.temperature, permittivity);
-            v.push(match self.options.epcpsaft_variant {
-                EPcpSaftVariants::DebyeHueckel => (
+            match self.options.epcpsaft_variant {
+                EPcpSaftVariants::DebyeHueckel => f(
                     "Ionic",
                     Ionic.helmholtz_energy_density(
                         p,
@@ -223,7 +240,7 @@ impl EPcpSaft {
                         bjerrum_length,
                     ),
                 ),
-                EPcpSaftVariants::MeanSphericalApproximation => (
+                EPcpSaftVariants::MeanSphericalApproximation => f(
                     "MSA",
                     Msa(self.options.msa_packing).helmholtz_energy_density(
                         p,
@@ -233,15 +250,15 @@ impl EPcpSaft {
                     ),
                 ),
                 EPcpSaftVariants::BiDH => {
-                    let (rho, z, di, g, f) = ion_pair_input(p, state, &d);
+                    let (rho, z, di, g, fp) = ion_pair_input(p, state, &d);
                     let constant = self.options.ion_pairing_constant;
-                    (
+                    f(
                         "BiDH",
-                        bidh::bidh(&rho, &z, &di, &g, &f, bjerrum_length, constant).0,
+                        bidh::bidh(&rho, &z, &di, &g, &fp, bjerrum_length, constant).0,
                     )
                 }
                 EPcpSaftVariants::BiMSA => {
-                    let (rho, z, di, g, f) = ion_pair_input(p, state, &d);
+                    let (rho, z, di, g, fp) = ion_pair_input(p, state, &d);
                     let delta = msa::packing_term(self.options.msa_packing, p, state, &d);
                     let input = bimsa::BiMsaInput {
                         rho: &rho,
@@ -250,13 +267,13 @@ impl EPcpSaft {
                         delta,
                         lb: bjerrum_length,
                         g: &g,
-                        f: &f,
+                        f: &fp,
                         constant: self.options.ion_pairing_constant,
                     };
-                    ("BiMSA", bimsa::bimsa(&input).0)
+                    f("BiMSA", bimsa::bimsa(&input).0)
                 }
-            });
-            v.push((
+            }
+            f(
                 "Born",
                 Born.helmholtz_energy_density(
                     p,
@@ -265,13 +282,12 @@ impl EPcpSaft {
                     bjerrum_length,
                     permittivity,
                 ),
-            ));
+            );
         }
-        v
     }
 }
 
-impl<D: DualNum<f64> + Copy> EPcpSaftPars<D> {
+impl<D: DualNum<Primitive = f64> + Copy> EPcpSaftPars<D> {
     /// Hard-sphere diameter: PC-SAFT diameter for neutral components,
     /// temperature-independent d_i = (1 - 0.12) sigma_i for ions (Held et al. 2014).
     pub fn diameter(&self, temperature: D) -> DVector<D> {
@@ -329,8 +345,13 @@ impl<D: DualNum<f64> + Copy> EPcpSaftPars<D> {
     }
 }
 
-/// Hard-sphere contribution (Boublik, Mansoori, Carnahan, Starling, Leland), as in `crate::hard_sphere`.
-fn hard_sphere<D: DualNum<f64> + Copy>(p: &EPcpSaftPars<D>, state: &StateHD<D>) -> D {
+/// Hard-sphere contribution (Boublik, Mansoori, Carnahan, Starling, Leland), as
+/// `crate::hard_sphere::HardSphere::helmholtz_energy_density_and_properties`: Helmholtz energy
+/// density, packing fractions and diameters (shared with the other contributions).
+fn hard_sphere_and_properties<D: DualNum<Primitive = f64> + Copy>(
+    p: &EPcpSaftPars<D>,
+    state: &StateHD<D>,
+) -> (D, [D; 4], DVector<D>) {
     let diameter = p.diameter(state.temperature);
     let mut zeta = [D::zero(); 4];
     for i in 0..diameter.len() {
@@ -342,10 +363,11 @@ fn hard_sphere<D: DualNum<f64> + Copy>(p: &EPcpSaftPars<D>, state: &StateHD<D>) 
     let density = state.partial_density.sum();
     zeta.iter_mut().for_each(|z| *z *= density);
     let frac_1mz3 = -(zeta[3] - 1.0).recip();
-    (zeta[1] * zeta[2] * frac_1mz3 * 3.0
+    let a = (zeta[1] * zeta[2] * frac_1mz3 * 3.0
         + zeta[2].powi(2) * frac_1mz3.powi(2) * zeta_23
         + (zeta[2] * zeta_23.powi(2) - zeta[0]) * (-zeta[3]).ln_1p())
-        / FRAC_PI_6
+        / FRAC_PI_6;
+    (a, zeta, diameter)
 }
 
 impl ResidualDyn for EPcpSaft {
@@ -353,7 +375,7 @@ impl ResidualDyn for EPcpSaft {
         self.parameters.pure.len()
     }
 
-    fn compute_max_density<D: DualNum<f64> + Copy>(&self, molefracs: &DVector<D>) -> D {
+    fn compute_max_density<D: DualNum<Primitive = f64> + Copy>(&self, molefracs: &DVector<D>) -> D {
         let msigma3 = self
             .params
             .m
@@ -361,11 +383,12 @@ impl ResidualDyn for EPcpSaft {
         (msigma3.map(D::from).dot(molefracs) * FRAC_PI_6).recip() * self.options.max_eta
     }
 
-    fn reduced_helmholtz_energy_density_contributions<D: DualNum<f64> + Copy>(
+    fn for_each_contribution<D: DualNum<Primitive = f64> + Copy>(
         &self,
         state: &StateHD<D>,
-    ) -> Vec<(&'static str, D)> {
-        self.contributions(&self.params.map(D::from), state, self.hard_chain)
+        f: impl FnMut(&'static str, D),
+    ) {
+        self.for_each_contribution_with(&self.params.map(D::from), state, self.hard_chain, f)
     }
 }
 
@@ -383,11 +406,11 @@ impl Molarweight for EPcpSaft {
 
 /// Used by the Helmholtz energy functional.
 impl HardSphereProperties for EPcpSaftPars {
-    fn monomer_shape<N: DualNum<f64>>(&self, _: N) -> MonomerShape<'_, N> {
-        MonomerShape::NonSpherical(self.m.map(N::from))
+    fn monomer_shape<N: DualNum<Primitive = f64>>(&self, _: N) -> MonomerShape<'_, N> {
+        MonomerShape::NonSpherical(&self.m)
     }
 
-    fn hs_diameter<D: DualNum<f64> + Copy>(&self, temperature: D) -> DVector<D> {
+    fn hs_diameter<D: DualNum<Primitive = f64> + Copy>(&self, temperature: D) -> DVector<D> {
         self.map(D::from).diameter(temperature)
     }
 }
@@ -396,7 +419,7 @@ impl HardSphereProperties for EPcpSaftPars {
 impl AssociationStrength for EPcpSaftPars {
     type Record = EPcpSaftAssociationRecord;
 
-    fn association_strength_ij<D: DualNum<f64> + Copy>(
+    fn association_strength_ij<D: DualNum<Primitive = f64> + Copy>(
         &self,
         temperature: D,
         comp_i: usize,
@@ -599,7 +622,7 @@ impl EntropyScaling for EPcpSaft {
 /// (d_i + d_j)/2 (expression of the association term) and logarithms of the pairing factors, for the ion-pairing
 /// variants.
 #[expect(clippy::type_complexity)]
-fn ion_pair_input<D: DualNum<f64> + Copy>(
+fn ion_pair_input<D: DualNum<Primitive = f64> + Copy>(
     p: &EPcpSaftPars<D>,
     state: &StateHD<D>,
     d: &DVector<D>,
@@ -677,7 +700,7 @@ mod tests {
         let v = 1000.0;
         let n = 1.0;
         let s = StateHD::new(t, v, &dvector![n]);
-        let a_rust = super::hard_sphere(&propane_parameters().params, &s) * v;
+        let a_rust = super::hard_sphere_and_properties(&propane_parameters().params, &s).0 * v;
         assert_relative_eq!(a_rust, 0.410610492598808, epsilon = 1e-10);
     }
 
@@ -687,12 +710,12 @@ mod tests {
         let v = 1000.0;
         let n = 1.0;
         let s = StateHD::new(t, v, &dvector![n]);
-        let a1 = super::hard_sphere(&propane_parameters().params, &s);
-        let a2 = super::hard_sphere(&butane_parameters().params, &s);
+        let a1 = super::hard_sphere_and_properties(&propane_parameters().params, &s).0;
+        let a2 = super::hard_sphere_and_properties(&butane_parameters().params, &s).0;
         let s1m = StateHD::new(t, v, &dvector![n, 0.0]);
-        let a1m = super::hard_sphere(&propane_butane_parameters().params, &s1m);
+        let a1m = super::hard_sphere_and_properties(&propane_butane_parameters().params, &s1m).0;
         let s2m = StateHD::new(t, v, &dvector![0.0, n]);
-        let a2m = super::hard_sphere(&propane_butane_parameters().params, &s2m);
+        let a2m = super::hard_sphere_and_properties(&propane_butane_parameters().params, &s2m).0;
         assert_relative_eq!(a1, a1m, epsilon = 1e-14);
         assert_relative_eq!(a2, a2m, epsilon = 1e-14);
     }
@@ -704,7 +727,7 @@ mod tests {
         let s = StateHD::new(250.0, 100.0, &dvector![0.3, 0.7]);
         let p = &propane_butane_parameters().params;
         assert_eq!(
-            super::hard_sphere(p, &s),
+            super::hard_sphere_and_properties(p, &s).0,
             HardSphere.helmholtz_energy_density(p, &s)
         );
     }
@@ -1140,7 +1163,7 @@ mod tests_parameter_fit {
         let pcsaft_ad =
             EPcpSaftBinary::<f64, 8>::seed_derivatives(&flat_binary_params(&pcsaft), ["k_ij"]);
         let pressure = Pressure::from_reduced(DualVec::from(45. * BAR.into_reduced()));
-        let t_init = Temperature::from_reduced(DualVec::from(500.0));
+        let t_init = Temperature::from_reduced(500.0);
         let x = DualVec::from(0.5);
         let t = PhaseEquilibrium::bubble_point(
             &pcsaft_ad,
@@ -1189,7 +1212,7 @@ mod tests_parameter_fit {
         let pcsaft_ad =
             EPcpSaftBinary::<f64, 8>::seed_derivatives(&flat_binary_params(&pcsaft), ["k_ij"]);
         let pressure = Pressure::from_reduced(DualVec::from(45. * BAR.into_reduced()));
-        let t_init = Temperature::from_reduced(DualVec::from(500.0));
+        let t_init = Temperature::from_reduced(500.0);
         let x = DualVec::from(0.5);
         let t = PhaseEquilibrium::dew_point(
             &pcsaft_ad,
@@ -1415,14 +1438,14 @@ mod tests_electrolyte {
         let x = dvector![0.4, 0.3, 0.2, 0.1];
         for (t, v) in [(300.0, 90.0), (350.0, 120.0), (450.0, 1.0e4)] {
             assert!(
-                epcpsaft
-                    .reduced_helmholtz_energy_density_contributions(&StateHD::new(t, v, &x))
+                (&epcpsaft)
+                    .reduced_helmholtz_energy_density_contributions(&StateHD::<f64>::new(t, v, &x))
                     .iter()
                     .all(|(_, a)| a.is_finite())
             );
             let s = StateHD::new(t, v, &x);
-            let a = pcsaft.reduced_helmholtz_energy_density_contributions(&s);
-            let b = epcpsaft.reduced_helmholtz_energy_density_contributions(&s);
+            let a = (&pcsaft).reduced_helmholtz_energy_density_contributions(&s);
+            let b = (&epcpsaft).reduced_helmholtz_energy_density_contributions(&s);
             assert_eq!(a.len(), b.len());
             for ((na, va), (nb, vb)) in a.iter().zip(b.iter()) {
                 assert_eq!(na, nb);
@@ -1483,8 +1506,8 @@ mod tests_electrolyte {
             )?;
             for (t, v) in [(250.0, 60.0), (350.0, 1.0e3)] {
                 let s = StateHD::new(t, v, &x);
-                let a = pcsaft.reduced_helmholtz_energy_density_contributions(&s);
-                let b = epcpsaft.reduced_helmholtz_energy_density_contributions(&s);
+                let a = (&pcsaft).reduced_helmholtz_energy_density_contributions(&s);
+                let b = (&epcpsaft).reduced_helmholtz_energy_density_contributions(&s);
                 assert_eq!(a.len(), 6);
                 assert_eq!(a, b);
             }
@@ -1507,8 +1530,8 @@ mod tests_electrolyte {
         let epcpsaft = EPcpSaft::new(water_nacl_parameters())?;
         for (t, x) in [(298.15, [0.9, 0.05, 0.05]), (350.0, [0.98, 0.01, 0.01])] {
             let s = StateHD::new(t, 30.0, &DVector::from_row_slice(&x));
-            let a = epcsaft.reduced_helmholtz_energy_density_contributions(&s);
-            let b = epcpsaft.reduced_helmholtz_energy_density_contributions(&s);
+            let a = (&epcsaft).reduced_helmholtz_energy_density_contributions(&s);
+            let b = (&epcpsaft).reduced_helmholtz_energy_density_contributions(&s);
             for name in ["Ionic", "Born"] {
                 let find = |c: &[(&str, f64)]| c.iter().find(|(n, _)| *n == name).unwrap().1;
                 assert_relative_eq!(find(&a), find(&b), max_relative = 1e-5);
@@ -1565,8 +1588,8 @@ mod tests_electrolyte {
         let water_no_eps = EPcpSaft::new(EPcpSaftParameters::new_pure(record)?)?;
         let s = StateHD::new(298.15, 18.0, &dvector![1.0]);
         assert_eq!(
-            water.reduced_helmholtz_energy_density_contributions(&s),
-            water_no_eps.reduced_helmholtz_energy_density_contributions(&s)
+            (&water).reduced_helmholtz_energy_density_contributions(&s),
+            (&water_no_eps).reduced_helmholtz_energy_density_contributions(&s)
         );
         assert!(water_no_eps.permittivity(&s).is_none());
         assert!(water.permittivity(&s).is_some());
@@ -1643,7 +1666,7 @@ mod tests_electrolyte {
             Dual64::from(0.0)
         ];
         let s = StateHD::new(Dual64::from(t), Dual64::from(v), &n);
-        let contributions = eos.reduced_helmholtz_energy_density_contributions(&s);
+        let contributions = (&eos).reduced_helmholtz_energy_density_contributions(&s);
         let (_, born) = contributions
             .iter()
             .find(|(name, _)| *name == "Born")
@@ -1728,7 +1751,7 @@ mod tests_electrolyte {
                 Dual64::from(c)
             ];
             let s = StateHD::new(Dual64::from(t), Dual64::from(v), &n);
-            let contributions = eos.reduced_helmholtz_energy_density_contributions(&s);
+            let contributions = (&eos).reduced_helmholtz_energy_density_contributions(&s);
             let (_, ionic) = contributions.iter().find(|(n, _)| *n == name).unwrap();
             let mu_dh = (*ionic * v).eps;
 
@@ -1758,7 +1781,8 @@ mod tests_electrolyte {
         let v = 25.0;
         let n = dvector![0.9, 0.05, 0.05];
         let a = |v: f64| {
-            eos.reduced_helmholtz_energy_density_contributions(&StateHD::new(t, v, &n))
+            (&eos)
+                .reduced_helmholtz_energy_density_contributions(&StateHD::new(t, v, &n))
                 .into_iter()
                 .map(|(name, a)| (name, a * v))
                 .collect::<Vec<_>>()
@@ -1767,7 +1791,7 @@ mod tests_electrolyte {
         let (ap, am) = (a(v + h), a(v - h));
         let vd = Dual64::from(v).derivative();
         let s = StateHD::new(Dual64::from(t), vd, &n.map(Dual64::from));
-        let ad = eos.reduced_helmholtz_energy_density_contributions(&s);
+        let ad = (&eos).reduced_helmholtz_energy_density_contributions(&s);
         for (((name, a_ad), (_, a_p)), (_, a_m)) in ad.iter().zip(ap.iter()).zip(am.iter()) {
             let fd = (a_p - a_m) / (2.0 * h);
             assert_relative_eq!((*a_ad * vd).eps, fd, max_relative = 1e-7);
@@ -1786,9 +1810,9 @@ mod tests_electrolyte {
             MsaPacking::Ions,
         )?;
         for (c, close) in [(1e-9, true), (0.05, false)] {
-            let s = StateHD::new(298.15, 30.0, &dvector![1.0, c, c]);
-            let a = dh.reduced_helmholtz_energy_density_contributions(&s);
-            let b = msa.reduced_helmholtz_energy_density_contributions(&s);
+            let s = StateHD::<f64>::new(298.15, 30.0, &dvector![1.0, c, c]);
+            let a = (&dh).reduced_helmholtz_energy_density_contributions(&s);
+            let b = (&msa).reduced_helmholtz_energy_density_contributions(&s);
             for ((na, va), (nb, vb)) in a.iter().zip(&b) {
                 if *na == "Ionic" {
                     assert_eq!(*nb, "MSA");
