@@ -8,20 +8,22 @@
 //! with respect to the screening parameter Γ and the fractions X_i of non-paired ions:
 //! - A_MSA(Γ): functional of the unrestricted primitive MSA ([msa_functional]) of all ions (paired or not);
 //! - Δ_ij(Γ) = exp(f_ij) K_ij g_ij exp[-λ_B (X'_i X'_j - z_i z_j) / d_ij] for a cation i and an anion j (0 otherwise),
-//!   X'_i = (z_i - η(Γ) d_i²) / (1 + Γ d_i), d_ij = (d_i + d_j) / 2; K_ij Bjerrum or Ebeling association constant
-//!   ([PairingConstant]), f_ij logarithm of an adjustable factor (`ion_pairing`), g_ij contact value of the
-//!   hard-sphere mixture of all species.
+//!   X'_i = (z_i - η(Γ) d_i²) / (1 + Γ d_i), d_ij = (d_i + d_j) / 2; K_ij association constant ([PairingConstant]:
+//!   Bjerrum, Ebeling or contact shell), f_ij logarithm of an adjustable factor (`ion_pairing`), g_ij contact value
+//!   of the hard-sphere mixture of all species.
 //!
 //! ∂F/∂X_i = 0 is the mass action law X_i = 1 / (1 + Σ_j ρ_j X_j Δ_ij); at that solution the pairing part equals
-//! Σ_i ρ_i (ln X_i - X_i / 2 + 1/2). ∂F/∂Γ = 0 is the BiMSA closure; for ions of equal size (η = 0) it is
-//! 4Γ²(1 + Γσ)² = κ² (α + Γσ) / (1 + Γσ) of Blum and Bernard with the fraction α of non-paired ions. The exponential
+//! Σ_i ρ_i (ln X_i - X_i / 2 + 1/2). ∂F/∂Γ = 0 is the BiMSA closure; for a symmetric salt (equal size and charge
+//! magnitude, η = 0) it is 4Γ²(1 + Γσ)² = κ² (α + Γσ) / (1 + Γσ) of Blum and Bernard with the fraction α of non-paired
+//! ions. The exponential
 //! factor of Δ is the electrostatic contact value of the pair normalized to 1 at infinite dilution. For ions of
 //! different size, η is that of the MSA functional (the Bernard-Blum closure uses a modified η).
 //!
 //! Alternatively ([BiMsaClosure::BernardBlum]), the equations of Bernard and Blum (J. Chem. Phys. 104 (1996) 4746,
 //! section IV, eqs. 109, 112-114, 119, 120), in which the pairs also enter η, Ω, the closure for Γ and the Helmholtz
 //! energy ([bimsa_bernard_blum]); the pair term of eq. 114 with the prefactor π of the general closure eq. 65.
-//! Identical to the variational form for ions of equal size and charge magnitude.
+//! Identical to the variational form for ions of equal size and charge magnitude. Both forms return NaN if the
+//! iteration does not converge.
 use super::ion_pairing::{PairingConstant, non_paired_fractions};
 use super::msa::{eta, msa_functional, screening_parameter};
 use nalgebra::{DMatrix, DVector};
@@ -30,6 +32,8 @@ use std::f64::consts::{FRAC_PI_2, PI};
 
 const MAX_ITER: usize = 200;
 const TOL: f64 = 1e-14;
+/// Relative size of the last Newton step of the Bernard-Blum iteration at convergence.
+const BB_TOL: f64 = 1e-12;
 /// Newton steps of the joint system in the number type D after the real parts converged.
 const EXTRA_ITERATIONS: usize = 5;
 
@@ -248,7 +252,10 @@ pub fn bimsa<D: DualNum<Primitive = f64> + Copy>(input: &BiMsaInput<D>) -> (D, D
         vm[k] -= hstep;
         (res_r(&vp)[i] - res_r(&vm)[i]) / (2.0 * hstep)
     });
-    let inv = jac.try_inverse().unwrap_or_else(|| DMatrix::identity(m, m));
+    let Some(inv) = jac.try_inverse() else {
+        let nan = D::from(f64::NAN);
+        return (nan, nan, DVector::from_element(n, nan));
+    };
     let mut v: Vec<D> = v0.drain(..).map(D::from).collect();
     for _ in 0..EXTRA_ITERATIONS {
         let r = residuals(v[0], &v[1..], rho, z, d, delta, lb, &pre);
@@ -423,12 +430,24 @@ pub fn bimsa_bernard_blum<D: DualNum<Primitive = f64> + Copy>(
             .sum::<f64>()
             .sqrt()
     };
+    let mut converged = false;
     for _ in 0..MAX_ITER {
         let r = res(&v);
         let Some(inv) = jacobian(&v).try_inverse() else {
             break;
         };
         let step = -(&inv * &r);
+        // converged: the full Newton step is below BB_TOL relative to the variable plus its typical size
+        if step
+            .iter()
+            .zip(&v)
+            .zip(&scale)
+            .all(|((s, x), sc)| s.abs() <= BB_TOL * (x.abs() + sc))
+        {
+            v.iter_mut().zip(step.iter()).for_each(|(x, s)| *x += s);
+            converged = true;
+            break;
+        }
         let mut t = 1.0;
         loop {
             let trial: Vec<f64> = v.iter().zip(step.iter()).map(|(a, b)| a + t * b).collect();
@@ -441,17 +460,11 @@ pub fn bimsa_bernard_blum<D: DualNum<Primitive = f64> + Copy>(
             }
             t *= 0.5;
         }
-        if step
-            .iter()
-            .zip(&v)
-            .all(|(s, x)| (t * s).abs() <= TOL * x.abs().max(1e-300))
-        {
-            break;
-        }
     }
-    let inv = jacobian(&v)
-        .try_inverse()
-        .unwrap_or_else(|| DMatrix::identity(m, m));
+    let (true, Some(inv)) = (converged, jacobian(&v).try_inverse()) else {
+        let nan = D::from(f64::NAN);
+        return (nan, nan, DVector::from_element(n, nan));
+    };
     let mut w: Vec<D> = v.iter().map(|&x| D::from(x)).collect();
     for _ in 0..EXTRA_ITERATIONS {
         let r = bernard_blum_residuals(&w, rho, z, d, delta, lb, &pre).0;

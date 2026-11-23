@@ -233,9 +233,8 @@ mod tests {
         assert!(high < low);
     }
 
-    /// Exact derivatives: d(a)/dρ_k from dual numbers equals central differences (the fractions X are solved
-    /// inside; by stationarity d a / d ρ_k = ∂a/∂ρ_k at fixed X), without and with the dipole term and for the
-    /// three association constants.
+    /// Exact derivatives: d(a)/dρ_k from dual numbers (the fractions X carry their implicit derivatives) equals
+    /// central differences, without and with the dipole term and for the three association constants.
     #[test]
     fn derivative_density() {
         let (rho, z, d, g, f) = setup(1.0);

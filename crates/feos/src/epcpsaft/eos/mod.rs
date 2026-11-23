@@ -138,6 +138,13 @@ impl EPcpSaft {
         parameters: EPcpSaftParameters,
         options: EPcpSaftOptions,
     ) -> FeosResult<Self> {
+        if let PairingConstant::Shell(theta) = options.ion_pairing_constant
+            && theta <= 1.0
+        {
+            return Err(feos_core::FeosError::IncompatibleParameters(format!(
+                "ion_pairing_constant Shell({theta}): the binding distance factor must be larger than 1"
+            )));
+        }
         let mut params = EPcpSaftPars::new(&parameters)?;
         params.born_delta = [options.born_delta_cation, options.born_delta_anion];
         params.dh_delta = options.dh_delta;

@@ -121,8 +121,10 @@ impl PairingConstant {
 
 /// Fractions of non-paired ions X_i for the densities `rho` (Å⁻³) and association strengths `delta` (Å³).
 ///
-/// Successive substitution in f64 to convergence, then Newton steps in the number type D: the result has the
-/// derivatives of the solution of X_i (1 + Σ_j ρ_j X_j Δ_ij) = 1 with respect to everything that D carries.
+/// Damped successive substitution in f64, Newton iteration in f64 to convergence (damped so that 0 < X <= 1; the
+/// substitution alone converges slowly for strong pairing with unequal densities), then Newton steps in the number
+/// type D: the result has the derivatives of the solution of X_i (1 + Σ_j ρ_j X_j Δ_ij) = 1 with respect to
+/// everything that D carries. NaN if the iteration does not converge.
 pub fn non_paired_fractions<D: DualNum<Primitive = f64> + Copy>(
     rho: &DVector<D>,
     delta: &DMatrix<D>,
@@ -145,6 +147,35 @@ pub fn non_paired_fractions<D: DualNum<Primitive = f64> + Copy>(
         if change < TOL {
             break;
         }
+    }
+    let mut converged = false;
+    for _ in 0..MAX_ITER {
+        let s = DVector::from_fn(n, |i, _| {
+            (0..n).fold(0.0, |acc, j| acc + rho_re[j] * x[j] * delta_re[(i, j)])
+        });
+        let g = DVector::from_fn(n, |i, _| x[i] * (s[i] + 1.0) - 1.0);
+        if g.amax() < TOL {
+            converged = true;
+            break;
+        }
+        let jac = DMatrix::from_fn(n, n, |i, j| {
+            let diag = if i == j { s[i] + 1.0 } else { 0.0 };
+            diag + x[i] * rho_re[j] * delta_re[(i, j)]
+        });
+        let Some(inv) = jac.try_inverse() else { break };
+        let step = inv * g;
+        let mut t = 1.0;
+        while (0..n).any(|i| {
+            let xi = x[i] - t * step[i];
+            xi <= 0.0 || xi > 1.0
+        }) && t > 1e-12
+        {
+            t *= 0.5;
+        }
+        x -= step * t;
+    }
+    if !converged {
+        return DVector::from_element(n, D::from(f64::NAN));
     }
     newton(&x.map(D::from), rho, delta, MAX_ITER, true)
 }
@@ -175,7 +206,9 @@ fn newton<D: DualNum<Primitive = f64> + Copy>(
             let diag = if i == j { s[i].re() + 1.0 } else { 0.0 };
             diag + x[i].re() * rho[j].re() * delta[(i, j)].re()
         });
-        let Some(inv) = jac.try_inverse() else { break };
+        let Some(inv) = jac.try_inverse() else {
+            return DVector::from_element(n, D::from(f64::NAN));
+        };
         let step = DVector::from_fn(n, |i, _| {
             (0..n).fold(D::zero(), |acc, j| acc + g[j] * inv[(i, j)])
         });
@@ -201,6 +234,28 @@ mod tests {
     use nalgebra::dmatrix;
     use nalgebra::dvector;
     use num_dual::{Dual64, first_derivative};
+
+    /// Strong pairing with unequal densities (ρΔ up to 1e8): converged to the closed form of a single salt,
+    /// ρ_P = 2 K ρ_+ ρ_- / (1 + K (ρ_+ + ρ_-) + [1 + 2 K (ρ_+ + ρ_-) + K² (ρ_+ - ρ_-)²]^1/2).
+    #[test]
+    fn strong_pairing_unequal_densities() {
+        for (k, ratio) in [
+            (1e3, 1.01),
+            (1e5, 1.01),
+            (1e6, 1.01),
+            (1e8, 1.5),
+            (1e6, 1.0),
+        ] {
+            let (rp, rm) = (1e-2 * ratio, 1e-2);
+            let rho = dvector![rp, rm];
+            let delta = dmatrix![0.0, k; k, 0.0];
+            let x = non_paired_fractions(&rho, &delta);
+            let s = 1.0 + 2.0 * k * (rp + rm) + (k * (rp - rm)).powi(2);
+            let pair = 2.0 * k * rp * rm / (1.0 + k * (rp + rm) + s.sqrt());
+            assert_relative_eq!(x[0], 1.0 - pair / rp, max_relative = 1e-8);
+            assert_relative_eq!(x[1], 1.0 - pair / rm, max_relative = 1e-8);
+        }
+    }
 
     #[test]
     fn exponential_integral_values() {
