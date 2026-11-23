@@ -9,8 +9,8 @@ use crate::state::PyState;
 #[cfg(feature = "dft")]
 use feos::epcpsaft::EPcpSaftFunctional;
 use feos::epcpsaft::{
-    BornDiameter, DQVariants, EPcpSaft, EPcpSaftOptions, EPcpSaftVariants, MsaPacking,
-    PairingConstant,
+    BiMsaClosure, BornDiameter, DQVariants, EPcpSaft, EPcpSaftOptions, EPcpSaftVariants,
+    MsaPacking, PairingConstant,
 };
 use feos_core::{EquationOfState, ReferenceSystem, ResidualDyn, StateHD};
 use pyo3::exceptions::PyValueError;
@@ -43,6 +43,9 @@ pub(crate) fn epcpsaft_options(
     born_diameter: &str,
     dh_delta: f64,
     ion_pairing_constant: &str,
+    ion_pairing_shell: f64,
+    bidh_dipole_factor: f64,
+    bimsa_closure: &str,
 ) -> PyResult<EPcpSaftOptions> {
     let born_diameter = match born_diameter {
         "hs" => BornDiameter::HardSphere,
@@ -56,9 +59,19 @@ pub(crate) fn epcpsaft_options(
     let ion_pairing_constant = match ion_pairing_constant {
         "bjerrum" => PairingConstant::Bjerrum,
         "ebeling" => PairingConstant::Ebeling,
+        "shell" => PairingConstant::Shell(ion_pairing_shell),
         _ => {
             return Err(PyErr::new::<PyValueError, _>(
-                r#"ion_pairing_constant must be "bjerrum" or "ebeling""#,
+                r#"ion_pairing_constant must be "bjerrum", "ebeling" or "shell""#,
+            ));
+        }
+    };
+    let bimsa_closure = match bimsa_closure {
+        "variational" => BiMsaClosure::Variational,
+        "bernard_blum" => BiMsaClosure::BernardBlum,
+        _ => {
+            return Err(PyErr::new::<PyValueError, _>(
+                r#"bimsa_closure must be "variational" or "bernard_blum""#,
             ));
         }
     };
@@ -83,6 +96,8 @@ pub(crate) fn epcpsaft_options(
         born_diameter,
         dh_delta,
         ion_pairing_constant,
+        bidh_dipole_factor,
+        bimsa_closure,
     })
 }
 
@@ -133,9 +148,21 @@ impl PyEquationOfState {
     /// dh_delta : float, optional
     ///     Correction added to the diameter of all ions in the Debye-Hückel term of the variant "dh"
     ///     (in Angstrom). Defaults to 0.
-    /// ion_pairing_constant : "bjerrum" | "ebeling", optional
+    /// ion_pairing_constant : "bjerrum" | "ebeling" | "shell", optional
     ///     Association constant of the ion pairs of the variants "bidh" and "bimsa": Bjerrum
-    ///     (zero below l_B |z_i z_j| / d_ij = 2) or Ebeling (analytic). Defaults to "bjerrum".
+    ///     (zero below l_B |z_i z_j| / d_ij = 2), Ebeling (analytic), or the Bjerrum integral over the
+    ///     shell from d_ij to `ion_pairing_shell` times d_ij (contact pairs). Defaults to "bjerrum".
+    /// ion_pairing_shell : float, optional
+    ///     Binding distance relative to the distance of closest approach for
+    ///     `ion_pairing_constant="shell"`. Defaults to 1.034 (Naseri Boroujeni et al. 2024).
+    /// bidh_dipole_factor : float, optional
+    ///     Factor of the interaction of the dipole of the ion pairs with the ionic atmosphere in the
+    ///     variant "bidh" (0: without; 0.25: inner permittivity of the pair 0, Naseri Boroujeni et al.
+    ///     2023). Defaults to 0.
+    /// bimsa_closure : "variational" | "bernard_blum", optional
+    ///     Closure of the variant "bimsa": stationary point of the variational functional, or the
+    ///     equations of Bernard and Blum (1996) with the pairs in the asymmetry parameter.
+    ///     Defaults to "variational".
     ///
     /// Returns
     /// -------
@@ -144,7 +171,7 @@ impl PyEquationOfState {
     ///     states.
     #[staticmethod]
     #[pyo3(
-        signature = (parameters, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", epcpsaft_variant="dh", msa_packing="ions", born_delta_cation=0.0, born_delta_anion=0.0, born_diameter="hs", dh_delta=0.0, ion_pairing_constant="bjerrum")
+        signature = (parameters, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", epcpsaft_variant="dh", msa_packing="ions", born_delta_cation=0.0, born_delta_anion=0.0, born_diameter="hs", dh_delta=0.0, ion_pairing_constant="bjerrum", ion_pairing_shell=1.034, bidh_dipole_factor=0.0, bimsa_closure="variational")
     )]
     #[expect(clippy::too_many_arguments)]
     pub fn epcpsaft(
@@ -160,6 +187,9 @@ impl PyEquationOfState {
         born_diameter: &str,
         dh_delta: f64,
         ion_pairing_constant: &str,
+        ion_pairing_shell: f64,
+        bidh_dipole_factor: f64,
+        bimsa_closure: &str,
     ) -> PyResult<Self> {
         let options = epcpsaft_options(
             max_eta,
@@ -173,6 +203,9 @@ impl PyEquationOfState {
             born_diameter,
             dh_delta,
             ion_pairing_constant,
+            ion_pairing_shell,
+            bidh_dipole_factor,
+            bimsa_closure,
         )?;
         let parameters = match parameters {
             PyParametersOrGcParameters::Parameters(parameters) => parameters.try_convert(),

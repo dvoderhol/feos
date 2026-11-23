@@ -31,6 +31,7 @@ pub use ad::{
     ValueGradient, electrolyte_properties_derivatives,
 };
 use association::Association;
+pub use bimsa::BiMsaClosure;
 use born::Born;
 use dispersion::Dispersion;
 pub use epcpsaft_binary::EPcpSaftBinary;
@@ -86,6 +87,11 @@ pub struct EPcpSaftOptions {
     pub dh_delta: f64,
     /// Association constant of the ion pairs (variants BiDH and BiMSA)
     pub ion_pairing_constant: PairingConstant,
+    /// Factor β_mn of the interaction of the dipole of the ion pairs with the ionic atmosphere (variant BiDH;
+    /// 0: without, 1/4: inner permittivity of the pair 0, Naseri Boroujeni et al. 2023)
+    pub bidh_dipole_factor: f64,
+    /// Closure of the variant BiMSA
+    pub bimsa_closure: BiMsaClosure,
 }
 
 impl Default for EPcpSaftOptions {
@@ -102,6 +108,8 @@ impl Default for EPcpSaftOptions {
             born_diameter: BornDiameter::HardSphere,
             dh_delta: 0.0,
             ion_pairing_constant: PairingConstant::Bjerrum,
+            bidh_dipole_factor: 0.0,
+            bimsa_closure: BiMsaClosure::Variational,
         }
     }
 }
@@ -254,7 +262,17 @@ impl EPcpSaft {
                     let constant = self.options.ion_pairing_constant;
                     f(
                         "BiDH",
-                        bidh::bidh(&rho, &z, &di, &g, &fp, bjerrum_length, constant).0,
+                        bidh::bidh(
+                            &rho,
+                            &z,
+                            &di,
+                            &g,
+                            &fp,
+                            bjerrum_length,
+                            constant,
+                            self.options.bidh_dipole_factor,
+                        )
+                        .0,
                     )
                 }
                 EPcpSaftVariants::BiMSA => {
@@ -269,6 +287,7 @@ impl EPcpSaft {
                         g: &g,
                         f: &fp,
                         constant: self.options.ion_pairing_constant,
+                        closure: self.options.bimsa_closure,
                     };
                     f("BiMSA", bimsa::bimsa(&input).0)
                 }

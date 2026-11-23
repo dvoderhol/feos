@@ -60,6 +60,17 @@ pub fn bjerrum_constant<D: DualNum<Primitive = f64> + Copy>(l: D, sigma: D) -> D
     l.powi(3) * (bjerrum_primitive(b) - bjerrum_primitive(D::from(2.0))) * (4.0 * PI)
 }
 
+/// Association constant of contact pairs (Å³, per pair, number-density based): the Bjerrum integral over the shell
+/// from the distance of closest approach σ to the binding distance θ σ (Naseri Boroujeni et al., J. Chem. Phys. 161
+/// (2024) 057103: θ = 1.034),
+///
+/// K = 4π ∫_σ^{θσ} r² exp(l / r) dr = 4π l³ [G(l/σ) - G(l/(θσ))],
+///
+/// with l = |z_i z_j| λ_B (Å); positive for all l > 0.
+pub fn shell_constant<D: DualNum<Primitive = f64> + Copy>(l: D, sigma: D, theta: f64) -> D {
+    l.powi(3) * (bjerrum_primitive(l / sigma) - bjerrum_primitive(l / (sigma * theta))) * (4.0 * PI)
+}
+
 /// Ebeling association constant of an ion pair (Å³, per pair, number-density based; Ebeling, Z. Phys. Chem.
 /// (Leipzig) 238 (1968) 400):
 ///
@@ -93,6 +104,8 @@ pub enum PairingConstant {
     Bjerrum,
     /// Ebeling constant ([ebeling_constant]; analytic in l / σ).
     Ebeling,
+    /// Contact-pair constant over the shell σ..θσ ([shell_constant]) with the given θ.
+    Shell(f64),
 }
 
 impl PairingConstant {
@@ -101,6 +114,7 @@ impl PairingConstant {
         match self {
             Self::Bjerrum => bjerrum_constant(l, sigma),
             Self::Ebeling => ebeling_constant(l, sigma),
+            Self::Shell(theta) => shell_constant(l, sigma, *theta),
         }
     }
 }
@@ -259,6 +273,27 @@ mod tests {
             let h = 1e-6 * l;
             let fd = (bjerrum_constant(l + h, sigma) - bjerrum_constant(l - h, sigma)) / (2.0 * h);
             assert_relative_eq!(d, fd, max_relative = 1e-6);
+        }
+    }
+
+    /// Shell constant against the trapezoidal rule with many points.
+    #[test]
+    fn shell_constant_quadrature() {
+        for (l, sigma) in [(7.4, 4.0), (10.19, 3.495), (28.6, 3.5)] {
+            let theta = 1.034;
+            let n = 200001;
+            let h = (theta * sigma - sigma) / (n - 1) as f64;
+            let f = |r: f64| r * r * (l / r).exp();
+            let mut sum = 0.5 * (f(sigma) + f(theta * sigma));
+            for k in 1..n - 1 {
+                sum += f(sigma + k as f64 * h);
+            }
+            let reference = 4.0 * PI * sum * h;
+            assert_relative_eq!(
+                shell_constant(l, sigma, theta),
+                reference,
+                max_relative = 1e-9
+            );
         }
     }
 

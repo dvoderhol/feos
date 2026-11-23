@@ -78,8 +78,12 @@ All options of `EquationOfState.epcpsaft` can be passed, including `epcpsaft_var
 `"msa"`: mean spherical approximation, `"bidh"`: Debye-Hückel with ion pairing, `"bimsa"`: binding mean spherical
 approximation) and `msa_packing` (`"ions"`: packing term of the MSA/BiMSA over the ions only, `"total"`: over all
 species). Ion pairing (BiDH, BiMSA) of a cation i and an anion j uses the association constant of
-`ion_pairing_constant` (`"bjerrum"`, default, or `"ebeling"`, analytic in l_B |z_i z_j| / d_ij) multiplied by
-exp(`ion_pairing`) of the binary record of i and j (default 0). Rows are evaluated in parallel.
+`ion_pairing_constant` (`"bjerrum"`, default; `"ebeling"`, analytic in l_B |z_i z_j| / d_ij; or `"shell"`, the
+Bjerrum integral from d_ij to `ion_pairing_shell` d_ij, default 1.034) multiplied by exp(`ion_pairing`) of the binary
+record of i and j (default 0). `bidh_dipole_factor` (default 0) includes the interaction of the dipole of the ion pairs
+with the ionic atmosphere in BiDH (0.25 in Naseri Boroujeni et al. 2023); `bimsa_closure` selects the closure of BiMSA
+(`"variational"`, default, or `"bernard_blum"`, the equations of Bernard and Blum 1996 with the pairs in the asymmetry
+parameter). Rows are evaluated in parallel.
 
 ## Examples
 The following example calculates pure-component vapor pressures including their derivatives with respect to the core PC-SAFT parameters for 10 Million temperatures in merely two seconds.
