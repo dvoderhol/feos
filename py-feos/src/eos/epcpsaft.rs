@@ -9,8 +9,8 @@ use crate::state::PyState;
 #[cfg(feature = "dft")]
 use feos::epcpsaft::EPcpSaftFunctional;
 use feos::epcpsaft::{
-    BiMsaClosure, BornDiameter, DQVariants, EPcpSaft, EPcpSaftOptions, EPcpSaftVariants,
-    MsaPacking, PairingConstant,
+    BornDiameter, DQVariants, EPcpSaft, EPcpSaftOptions, EPcpSaftVariants, MsaPacking,
+    PairingConstant,
 };
 use feos_core::{EquationOfState, ReferenceSystem, ResidualDyn, StateHD};
 use pyo3::exceptions::PyValueError;
@@ -45,7 +45,7 @@ pub(crate) fn epcpsaft_options(
     ion_pairing_constant: &str,
     ion_pairing_shell: f64,
     bidh_dipole_factor: f64,
-    bimsa_closure: &str,
+    permittivity_offset: Vec<f64>,
 ) -> PyResult<EPcpSaftOptions> {
     let born_diameter = match born_diameter {
         "hs" => BornDiameter::HardSphere,
@@ -66,15 +66,13 @@ pub(crate) fn epcpsaft_options(
             ));
         }
     };
-    let bimsa_closure = match bimsa_closure {
-        "variational" => BiMsaClosure::Variational,
-        "bernard_blum" => BiMsaClosure::BernardBlum,
-        _ => {
-            return Err(PyErr::new::<PyValueError, _>(
-                r#"bimsa_closure must be "variational" or "bernard_blum""#,
-            ));
-        }
-    };
+    if permittivity_offset.len() > 12 {
+        return Err(PyErr::new::<PyValueError, _>(
+            "permittivity_offset: at most 12 coefficients",
+        ));
+    }
+    let mut offset = [0.0; 12];
+    offset[..permittivity_offset.len()].copy_from_slice(&permittivity_offset);
     let msa_packing = match msa_packing {
         "ions" => MsaPacking::Ions,
         "total" => MsaPacking::Total,
@@ -97,7 +95,7 @@ pub(crate) fn epcpsaft_options(
         dh_delta,
         ion_pairing_constant,
         bidh_dipole_factor,
-        bimsa_closure,
+        permittivity_offset: offset,
     })
 }
 
@@ -151,18 +149,18 @@ impl PyEquationOfState {
     /// ion_pairing_constant : "bjerrum" | "ebeling" | "shell", optional
     ///     Association constant of the ion pairs of the variants "bidh" and "bimsa": Bjerrum
     ///     (zero below l_B |z_i z_j| / d_ij = 2), Ebeling (analytic), or the Bjerrum integral over the
-    ///     shell from d_ij to `ion_pairing_shell` times d_ij (contact pairs). Defaults to "bjerrum".
+    ///     shell from d_ij to `ion_pairing_shell` times d_ij (contact pairs). Defaults to "shell".
     /// ion_pairing_shell : float, optional
     ///     Binding distance relative to the distance of closest approach for
-    ///     `ion_pairing_constant="shell"`. Defaults to 1.034 (Naseri Boroujeni et al. 2024).
+    ///     `ion_pairing_constant="shell"` (adjustable parameter "ion_pairing_shell"). Defaults to 1.034
+    ///     (Naseri Boroujeni et al. 2024).
     /// bidh_dipole_factor : float, optional
     ///     Factor of the interaction of the dipole of the ion pairs with the ionic atmosphere in the
     ///     variant "bidh" (0: without; 0.25: inner permittivity of the pair 0, Naseri Boroujeni et al.
-    ///     2023). Defaults to 0.
-    /// bimsa_closure : "variational" | "bernard_blum", optional
-    ///     Closure of the variant "bimsa": stationary point of the variational functional, or the
-    ///     equations of Bernard and Blum (1996) with the pairs in the asymmetry parameter.
-    ///     Defaults to "variational".
+    ///     2023). Defaults to 0.25.
+    /// permittivity_offset : list[float], optional
+    ///     Coefficients c_k (at most 12) of the offset sum_k c_k tau^k, tau = (T/K - 298.15)/100, added to
+    ///     the relative permittivity. Defaults to no offset.
     ///
     /// Returns
     /// -------
@@ -171,7 +169,7 @@ impl PyEquationOfState {
     ///     states.
     #[staticmethod]
     #[pyo3(
-        signature = (parameters, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", epcpsaft_variant="dh", msa_packing="ions", born_delta_cation=0.0, born_delta_anion=0.0, born_diameter="hs", dh_delta=0.0, ion_pairing_constant="bjerrum", ion_pairing_shell=1.034, bidh_dipole_factor=0.0, bimsa_closure="variational")
+        signature = (parameters, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", epcpsaft_variant="dh", msa_packing="ions", born_delta_cation=0.0, born_delta_anion=0.0, born_diameter="hs", dh_delta=0.0, ion_pairing_constant="shell", ion_pairing_shell=1.034, bidh_dipole_factor=0.25, permittivity_offset=vec![])
     )]
     #[expect(clippy::too_many_arguments)]
     pub fn epcpsaft(
@@ -189,7 +187,7 @@ impl PyEquationOfState {
         ion_pairing_constant: &str,
         ion_pairing_shell: f64,
         bidh_dipole_factor: f64,
-        bimsa_closure: &str,
+        permittivity_offset: Vec<f64>,
     ) -> PyResult<Self> {
         let options = epcpsaft_options(
             max_eta,
@@ -205,7 +203,7 @@ impl PyEquationOfState {
             ion_pairing_constant,
             ion_pairing_shell,
             bidh_dipole_factor,
-            bimsa_closure,
+            permittivity_offset,
         )?;
         let parameters = match parameters {
             PyParametersOrGcParameters::Parameters(parameters) => parameters.try_convert(),

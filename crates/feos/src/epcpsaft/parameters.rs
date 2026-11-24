@@ -252,8 +252,8 @@ pub type EPcpSaftParameters =
 /// The ePCP-SAFT parameters in an easier accessible format.
 ///
 /// All model parameters are of the generic type `D` (`f64` or a dual number for derivatives
-/// with respect to model parameters). `m` to `born_delta` are the adjustable parameters,
-/// `mu2` to `e_k_ij` are derived from them, the remaining fields describe the structure.
+/// with respect to model parameters). `m` to `shell_factor` are the adjustable parameters,
+/// `mu2` to `e_k_ij` are derived from them, the remaining fields (and `permittivity_offset`) describe the structure.
 #[derive(Clone, Debug)]
 pub struct EPcpSaftPars<D = f64> {
     pub m: DVector<D>,
@@ -273,6 +273,10 @@ pub struct EPcpSaftPars<D = f64> {
     pub born_delta: [D; 2],
     /// correction of the ion diameter in the Debye-Hückel term (all ions) in Angstrom
     pub dh_delta: D,
+    /// binding distance factor θ of the contact-shell association constant (BiDH, BiMSA)
+    pub shell_factor: D,
+    /// coefficients c_k of the additive permittivity offset Σ_k c_k τ^k, τ = (T/K - 298.15)/100
+    pub permittivity_offset: [f64; 12],
     /// base of the Born diameter of the ions: `sigma` if true, hard-sphere diameter otherwise
     pub born_sigma: bool,
     pub mu2: DVector<D>,
@@ -372,6 +376,7 @@ impl EPcpSaftPars {
             permittivity,
             [0.0, 0.0],
             0.0,
+            1.0,
             Self {
                 m: DVector::zeros(0),
                 sigma: DVector::zeros(0),
@@ -383,6 +388,8 @@ impl EPcpSaftPars {
                 permittivity: None,
                 born_delta: [0.0; 2],
                 dh_delta: 0.0,
+                shell_factor: 0.0,
+                permittivity_offset: [0.0; 12],
                 born_sigma: false,
                 mu2: DVector::zeros(0),
                 q2: DVector::zeros(0),
@@ -418,6 +425,7 @@ impl<D: DualNum<Primitive = f64> + Copy> EPcpSaftPars<D> {
         permittivity: Option<[DVector<D>; 3]>,
         born_delta: [D; 2],
         dh_delta: D,
+        shell_factor: D,
         structure: EPcpSaftPars<D0>,
     ) -> Self {
         let n = m.len();
@@ -460,6 +468,8 @@ impl<D: DualNum<Primitive = f64> + Copy> EPcpSaftPars<D> {
             permittivity,
             born_delta,
             dh_delta,
+            shell_factor,
+            permittivity_offset: structure.permittivity_offset,
             born_sigma: structure.born_sigma,
             mu2,
             q2,
@@ -496,6 +506,7 @@ impl<D: DualNum<Primitive = f64> + Copy> EPcpSaftPars<D> {
             self.permittivity.as_ref().map(|p| p.each_ref().map(v)),
             self.born_delta.map(&f),
             f(self.dh_delta),
+            f(self.shell_factor),
             self.clone(),
         )
     }

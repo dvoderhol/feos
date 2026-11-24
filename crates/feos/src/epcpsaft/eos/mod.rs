@@ -31,7 +31,6 @@ pub use ad::{
     ValueGradient, electrolyte_properties_derivatives,
 };
 use association::Association;
-pub use bimsa::BiMsaClosure;
 use born::Born;
 use dispersion::Dispersion;
 pub use epcpsaft_binary::EPcpSaftBinary;
@@ -53,7 +52,7 @@ pub enum EPcpSaftVariants {
     MeanSphericalApproximation,
     /// Debye-Hückel term with ion pairing (BiDH; Naseri Boroujeni et al. 2023), see [bidh].
     BiDH,
-    /// Binding mean spherical approximation (BiMSA; Blum and Bernard 1995), variational form, see [bimsa].
+    /// Binding mean spherical approximation (BiMSA; Bernard and Blum 1996), see [bimsa].
     BiMSA,
 }
 
@@ -85,13 +84,14 @@ pub struct EPcpSaftOptions {
     pub born_diameter: BornDiameter,
     /// Correction added to the diameter of all ions in the Debye-Hückel term (variant DebyeHueckel; Angstrom)
     pub dh_delta: f64,
-    /// Association constant of the ion pairs (variants BiDH and BiMSA)
+    /// Association constant of the ion pairs (variants BiDH and BiMSA); the value of
+    /// [PairingConstant::Shell] is the initial binding distance factor θ (adjustable parameter `shell_factor`)
     pub ion_pairing_constant: PairingConstant,
     /// Factor β_mn of the interaction of the dipole of the ion pairs with the ionic atmosphere (variant BiDH;
     /// 0: without, 1/4: inner permittivity of the pair 0, Naseri Boroujeni et al. 2023)
     pub bidh_dipole_factor: f64,
-    /// Closure of the variant BiMSA
-    pub bimsa_closure: BiMsaClosure,
+    /// Coefficients c_k of the offset Σ_k c_k τ^k, τ = (T/K - 298.15)/100, added to the relative permittivity
+    pub permittivity_offset: [f64; 12],
 }
 
 impl Default for EPcpSaftOptions {
@@ -107,9 +107,9 @@ impl Default for EPcpSaftOptions {
             born_delta_anion: 0.0,
             born_diameter: BornDiameter::HardSphere,
             dh_delta: 0.0,
-            ion_pairing_constant: PairingConstant::Bjerrum,
-            bidh_dipole_factor: 0.0,
-            bimsa_closure: BiMsaClosure::Variational,
+            ion_pairing_constant: PairingConstant::default(),
+            bidh_dipole_factor: 0.25,
+            permittivity_offset: [0.0; 12],
         }
     }
 }
@@ -148,6 +148,10 @@ impl EPcpSaft {
         let mut params = EPcpSaftPars::new(&parameters)?;
         params.born_delta = [options.born_delta_cation, options.born_delta_anion];
         params.dh_delta = options.dh_delta;
+        if let PairingConstant::Shell(theta) = options.ion_pairing_constant {
+            params.shell_factor = theta;
+        }
+        params.permittivity_offset = options.permittivity_offset;
         params.born_sigma = options.born_diameter == BornDiameter::Sigma;
         let hard_chain = params.m.iter().any(|m| (m - 1.0).abs() > 1e-15);
 
@@ -277,6 +281,7 @@ impl EPcpSaft {
                             &fp,
                             bjerrum_length,
                             constant,
+                            p.shell_factor,
                             self.options.bidh_dipole_factor,
                         )
                         .0,
@@ -294,7 +299,7 @@ impl EPcpSaft {
                         g: &g,
                         f: &fp,
                         constant: self.options.ion_pairing_constant,
-                        closure: self.options.bimsa_closure,
+                        shell_factor: p.shell_factor,
                     };
                     f("BiMSA", bimsa::bimsa(&input).0)
                 }

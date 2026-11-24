@@ -66,8 +66,8 @@ pub fn bjerrum_constant<D: DualNum<Primitive = f64> + Copy>(l: D, sigma: D) -> D
 ///
 /// K = 4π ∫_σ^{θσ} r² exp(l / r) dr = 4π l³ [G(l/σ) - G(l/(θσ))],
 ///
-/// with l = |z_i z_j| λ_B (Å); positive for all l > 0.
-pub fn shell_constant<D: DualNum<Primitive = f64> + Copy>(l: D, sigma: D, theta: f64) -> D {
+/// with l = |z_i z_j| λ_B (Å) and the binding distance factor θ (> 1); positive for all l > 0.
+pub fn shell_constant<D: DualNum<Primitive = f64> + Copy>(l: D, sigma: D, theta: D) -> D {
     l.powi(3) * (bjerrum_primitive(l / sigma) - bjerrum_primitive(l / (sigma * theta))) * (4.0 * PI)
 }
 
@@ -97,24 +97,37 @@ pub fn ebeling_constant<D: DualNum<Primitive = f64> + Copy>(l: D, sigma: D) -> D
 }
 
 /// Association constant of an ion pair used by the ion-pairing variants.
-#[derive(Copy, Clone, PartialEq, Debug, Default)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub enum PairingConstant {
     /// Bjerrum constant ([bjerrum_constant]; zero for l / σ <= 2).
-    #[default]
     Bjerrum,
     /// Ebeling constant ([ebeling_constant]; analytic in l / σ).
     Ebeling,
-    /// Contact-pair constant over the shell σ..θσ ([shell_constant]) with the given θ.
+    /// Contact-pair constant over the shell σ..θσ ([shell_constant]); the value is the initial binding distance
+    /// factor θ of the parameters (`shell_factor` of the model parameters, adjustable).
     Shell(f64),
 }
 
+impl Default for PairingConstant {
+    /// Contact-pair constant with θ = 1.034 (Naseri Boroujeni et al., J. Chem. Phys. 161 (2024) 057103).
+    fn default() -> Self {
+        Self::Shell(1.034)
+    }
+}
+
 impl PairingConstant {
-    /// Association constant (Å³) for l = |z_i z_j| λ_B and the distance of closest approach σ.
-    pub fn constant<D: DualNum<Primitive = f64> + Copy>(&self, l: D, sigma: D) -> D {
+    /// Association constant (Å³) for l = |z_i z_j| λ_B, the distance of closest approach σ and the binding distance
+    /// factor `shell_factor` (used by [PairingConstant::Shell] only).
+    pub fn constant<D: DualNum<Primitive = f64> + Copy>(
+        &self,
+        l: D,
+        sigma: D,
+        shell_factor: D,
+    ) -> D {
         match self {
             Self::Bjerrum => bjerrum_constant(l, sigma),
             Self::Ebeling => ebeling_constant(l, sigma),
-            Self::Shell(theta) => shell_constant(l, sigma, *theta),
+            Self::Shell(_) => shell_constant(l, sigma, shell_factor),
         }
     }
 }
@@ -348,6 +361,17 @@ mod tests {
                 shell_constant(l, sigma, theta),
                 reference,
                 max_relative = 1e-9
+            );
+            // dK/dθ = 4π (θσ)² σ exp(l / (θσ))
+            let (_, dk) = first_derivative(
+                |t: Dual64| shell_constant(Dual64::from(l), Dual64::from(sigma), t),
+                theta,
+            );
+            let r = theta * sigma;
+            assert_relative_eq!(
+                dk,
+                4.0 * PI * r * r * sigma * (l / r).exp(),
+                max_relative = 1e-10
             );
         }
     }

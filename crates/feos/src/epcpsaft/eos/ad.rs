@@ -29,6 +29,8 @@ pub enum EPcpSaftParameter {
     BornDeltaAnion,
     /// correction of the ion diameter in the Debye-Hückel term
     DhDelta,
+    /// binding distance factor θ of the contact-shell association constant (BiDH, BiMSA)
+    IonPairingShell,
     /// logarithm of the factor of the association constant of a cation and an anion (BiDH, BiMSA)
     IonPairing(usize, usize),
 }
@@ -97,7 +99,7 @@ impl EPcpSaftAD<f64> {
                 | PolarizabilityScaling(i)
                 | CorrelationIntegralParameter(i) => Some(i),
                 KIJ(i, j) | IonPairing(i, j) => Some(i.max(j)),
-                BornDeltaCation | BornDeltaAnion | DhDelta => None,
+                BornDeltaCation | BornDeltaAnion | DhDelta | IonPairingShell => None,
             };
             if component.is_some_and(|i| i >= n) {
                 return error(format!("{parameter:?}: component index out of range"));
@@ -152,6 +154,17 @@ impl EPcpSaftAD<f64> {
                 BornDeltaCation => seed(&mut p.born_delta[0]),
                 BornDeltaAnion => seed(&mut p.born_delta[1]),
                 DhDelta => seed(&mut p.dh_delta),
+                IonPairingShell => {
+                    if !matches!(
+                        self.model.options.ion_pairing_constant,
+                        super::PairingConstant::Shell(_)
+                    ) {
+                        return error(format!(
+                            "{parameter:?}: the association constant is not the contact-shell constant"
+                        ));
+                    }
+                    seed(&mut p.shell_factor)
+                }
                 IonPairing(i, j) => {
                     if p0.z[i] * p0.z[j] >= 0.0 {
                         return error(format!(
@@ -409,6 +422,7 @@ mod tests {
             BornDeltaCation => p.born_delta[0] += h,
             BornDeltaAnion => p.born_delta[1] += h,
             DhDelta => p.dh_delta += h,
+            IonPairingShell => p.shell_factor += h,
             IonPairing(i, j) => {
                 p.ion_pairing[(i, j)] += h;
                 p.ion_pairing[(j, i)] += h
@@ -732,6 +746,7 @@ mod tests {
                 BornDeltaCation => p.born_delta[0] += h,
                 BornDeltaAnion => p.born_delta[1] += h,
                 DhDelta => p.dh_delta += h,
+                IonPairingShell => p.shell_factor += h,
                 IonPairing(i, j) => {
                     p.ion_pairing[(i, j)] += h;
                     p.ion_pairing[(j, i)] += h
@@ -836,25 +851,22 @@ mod tests {
     /// parameters (screening parameter and fractions of non-paired ions solved inside).
     #[test]
     fn gradient_ion_pairing() -> FeosResult<()> {
-        use super::super::{BiMsaClosure, EPcpSaftVariants::*, PairingConstant::*};
-        for (variant, constant, dipole, closure) in [
-            (BiDH, Bjerrum, 0.0, BiMsaClosure::Variational),
-            (BiMSA, Bjerrum, 0.0, BiMsaClosure::Variational),
-            (BiDH, Ebeling, 0.0, BiMsaClosure::Variational),
-            (BiMSA, Ebeling, 0.0, BiMsaClosure::Variational),
-            (BiDH, Shell(1.034), 0.0, BiMsaClosure::Variational),
-            (BiDH, Shell(1.034), 0.25, BiMsaClosure::Variational),
-            (BiDH, Bjerrum, 0.25, BiMsaClosure::Variational),
-            (BiMSA, Shell(1.034), 0.0, BiMsaClosure::Variational),
-            (BiMSA, Shell(1.034), 0.0, BiMsaClosure::BernardBlum),
-            (BiMSA, Bjerrum, 0.0, BiMsaClosure::BernardBlum),
+        use super::super::{EPcpSaftVariants::*, PairingConstant::*};
+        for (variant, constant, dipole) in [
+            (BiDH, Bjerrum, 0.0),
+            (BiMSA, Bjerrum, 0.0),
+            (BiDH, Ebeling, 0.0),
+            (BiMSA, Ebeling, 0.0),
+            (BiDH, Shell(1.034), 0.0),
+            (BiDH, Shell(1.034), 0.25),
+            (BiDH, Bjerrum, 0.25),
+            (BiMSA, Shell(1.034), 0.0),
         ] {
             let state = StateHD::new(310.0, 25.0, &dvector![0.9, 0.05, 0.05]);
             let options = super::super::EPcpSaftOptions {
                 epcpsaft_variant: variant,
                 ion_pairing_constant: constant,
                 bidh_dipole_factor: dipole,
-                bimsa_closure: closure,
                 born_delta_cation: 0.1,
                 ..Default::default()
             };
@@ -873,19 +885,42 @@ mod tests {
                 EPcpSaftParameters::new(water_nacl_records(), binary)?,
                 options,
             )?;
-            check_gradient(
-                eos,
-                state,
-                [
-                    IonPairing(1, 2),
-                    Sigma(1),
-                    Sigma(2),
-                    EpsilonK(1),
-                    DipoleScaling(1),
-                    CorrelationIntegralParameter(2),
-                    BornDeltaCation,
-                ],
-            )?;
+            if matches!(constant, Shell(_)) {
+                check_gradient(
+                    eos,
+                    state,
+                    [
+                        IonPairing(1, 2),
+                        IonPairingShell,
+                        Sigma(1),
+                        Sigma(2),
+                        EpsilonK(1),
+                        DipoleScaling(1),
+                        CorrelationIntegralParameter(2),
+                        BornDeltaCation,
+                    ],
+                )?;
+            } else {
+                check_gradient(
+                    eos,
+                    state,
+                    [
+                        IonPairing(1, 2),
+                        Sigma(1),
+                        Sigma(2),
+                        EpsilonK(1),
+                        DipoleScaling(1),
+                        CorrelationIntegralParameter(2),
+                        BornDeltaCation,
+                    ],
+                )?;
+                // the shell factor is only an adjustable parameter of the contact-shell constant
+                let ad = EPcpSaftAD::new(Arc::new(EPcpSaft::with_options(
+                    EPcpSaftParameters::new(water_nacl_records(), vec![])?,
+                    options,
+                )?));
+                assert!(ad.derivatives([IonPairingShell]).is_err());
+            }
         }
         Ok(())
     }

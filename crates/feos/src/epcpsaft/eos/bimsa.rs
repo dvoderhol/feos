@@ -1,29 +1,28 @@
-//! Binding mean spherical approximation (BiMSA; Blum and Bernard 1995, Bernard and Blum 1996, Simonin et al. 1998)
-//! in a variational form.
+//! Binding mean spherical approximation (BiMSA) with the closure of Bernard and Blum (J. Chem. Phys. 104 (1996) 4746,
+//! section IV, eqs. 109, 112-114, 119, 120; Blum and Bernard, J. Stat. Phys. 79 (1995) 569; Simonin, Bernard and
+//! Blum, J. Phys. Chem. B 102 (1998) 4411, eqs. 1-11).
 //!
-//! The Helmholtz energy is the stationary value of
+//! The unknowns are the screening parameter Γ, the parameter η and the fractions X_i of non-paired ions:
+//! - Γ² = π λ_B (Σ_k ρ_k X'_k² + Σ_P ρ_P/σ_P (σ_i/u_i + σ_j/u_j) X'_i X'_j),
+//! - η = π/(2ΔΩ) (Σ_k ρ_k z_k σ_k/u_k + Σ_P ρ_P (z_i σ_j² + z_j σ_i²) / (2 σ_P u_i u_j)),
+//!   Ω = 1 + π/(2Δ) (Σ_k ρ_k σ_k³/u_k + Σ_P ρ_P σ_i² σ_j² / (σ_P u_i u_j)),
+//! - X_i (1 + Σ_j ρ_j X_j Δ_ij) = 1 (mass action law),
 //!
-//! F(Γ, X) / (kT V) = A_MSA(Γ) + Σ_i ρ_i (ln X_i - X_i + 1) - 1/2 Σ_ij ρ_i ρ_j X_i X_j Δ_ij(Γ)
+//! with u_k = 1 + Γσ_k, X'_k = (z_k - η σ_k²)/u_k, the distance of closest approach σ_P = (σ_i + σ_j)/2 and the pair
+//! densities ρ_P = ρ_i ρ_j X_i X_j Δ_ij of all cation-anion pairs P = (i, j); for one pair these are eqs. 112-114 of
+//! Bernard and Blum with the prefactor π of eq. 65 (eqs. 4-6 of Simonin et al. 1998, who denote σ_i + σ_j by σ_P);
+//! for several pairs the pair terms are summed. The association strength
+//! is Δ_ij = exp(f_ij) K_ij g_ij exp[-λ_B (X'_i X'_j - z_i z_j) / σ_P] with the association constant K_ij
+//! ([PairingConstant]: Bjerrum, Ebeling or contact shell), the logarithm f_ij of an adjustable factor (`ion_pairing`)
+//! and the contact value g_ij of the hard-sphere mixture of all species.
 //!
-//! with respect to the screening parameter Γ and the fractions X_i of non-paired ions:
-//! - A_MSA(Γ): functional of the unrestricted primitive MSA ([msa_functional]) of all ions (paired or not);
-//! - Δ_ij(Γ) = exp(f_ij) K_ij g_ij exp[-λ_B (X'_i X'_j - z_i z_j) / d_ij] for a cation i and an anion j (0 otherwise),
-//!   X'_i = (z_i - η(Γ) d_i²) / (1 + Γ d_i), d_ij = (d_i + d_j) / 2; K_ij association constant ([PairingConstant]:
-//!   Bjerrum, Ebeling or contact shell), f_ij logarithm of an adjustable factor (`ion_pairing`), g_ij contact value
-//!   of the hard-sphere mixture of all species.
+//! The Helmholtz energy density is -λ_B Σ_k ρ_k z_k (Γ z_k + η σ_k)/u_k + Γ³/(3π) + λ_B η Σ_P ρ_P/(2σ_P) (σ_i² X'_j
+//! u_j + σ_j² X'_i u_i)/(u_i u_j) + Σ_k ρ_k (ln X_k - X_k/2 + 1/2) (eqs. 119, 120).
 //!
-//! ∂F/∂X_i = 0 is the mass action law X_i = 1 / (1 + Σ_j ρ_j X_j Δ_ij); at that solution the pairing part equals
-//! Σ_i ρ_i (ln X_i - X_i / 2 + 1/2). ∂F/∂Γ = 0 is the BiMSA closure; for a symmetric salt (equal size and charge
-//! magnitude, η = 0) it is 4Γ²(1 + Γσ)² = κ² (α + Γσ) / (1 + Γσ) of Blum and Bernard with the fraction α of non-paired
-//! ions. The exponential
-//! factor of Δ is the electrostatic contact value of the pair normalized to 1 at infinite dilution. For ions of
-//! different size, η is that of the MSA functional (the Bernard-Blum closure uses a modified η).
-//!
-//! Alternatively ([BiMsaClosure::BernardBlum]), the equations of Bernard and Blum (J. Chem. Phys. 104 (1996) 4746,
-//! section IV, eqs. 109, 112-114, 119, 120), in which the pairs also enter η, Ω, the closure for Γ and the Helmholtz
-//! energy ([bimsa_bernard_blum]); the pair term of eq. 114 with the prefactor π of the general closure eq. 65.
-//! Identical to the variational form for ions of equal size and charge magnitude. Both forms return NaN if the
-//! iteration does not converge.
+//! The iteration starts from the stationary point of the functional
+//! A_MSA(Γ) + Σ_i ρ_i (ln X_i - X_i + 1) - 1/2 Σ_ij ρ_i ρ_j X_i X_j Δ_ij(Γ)
+//! with η of the MSA without pairs ([msa_functional]), which coincides with the solution for ions of equal size and
+//! charge magnitude. NaN is returned if the iteration does not converge.
 use super::ion_pairing::{PairingConstant, non_paired_fractions};
 use super::msa::{eta, msa_functional, screening_parameter};
 use nalgebra::{DMatrix, DVector};
@@ -36,16 +35,6 @@ const TOL: f64 = 1e-14;
 const BB_TOL: f64 = 1e-12;
 /// Newton steps of the joint system in the number type D after the real parts converged.
 const EXTRA_ITERATIONS: usize = 5;
-
-/// Closure of the BiMSA.
-#[derive(Copy, Clone, PartialEq, Debug, Default)]
-pub enum BiMsaClosure {
-    /// Stationary point of the variational functional (η of the MSA without pairs).
-    #[default]
-    Variational,
-    /// Equations of Bernard and Blum (1996) with the pairs in η, Ω, Γ and the Helmholtz energy.
-    BernardBlum,
-}
 
 /// Inputs of the BiMSA term that do not depend on Γ and X.
 pub struct BiMsaInput<'a, D> {
@@ -61,8 +50,8 @@ pub struct BiMsaInput<'a, D> {
     pub f: &'a DMatrix<D>,
     /// association constant
     pub constant: PairingConstant,
-    /// closure
-    pub closure: BiMsaClosure,
+    /// binding distance factor θ of the contact-shell constant ([PairingConstant::constant])
+    pub shell_factor: D,
 }
 
 impl<D: DualNum<Primitive = f64> + Copy> BiMsaInput<'_, D> {
@@ -76,6 +65,7 @@ impl<D: DualNum<Primitive = f64> + Copy> BiMsaInput<'_, D> {
             let k = self.constant.constant(
                 self.lb * (self.z[i] * self.z[j]).abs(),
                 (self.d[i] + self.d[j]) * 0.5,
+                self.shell_factor,
             );
             self.f[(i, j)].exp() * k * self.g[(i, j)]
         })
@@ -159,69 +149,30 @@ fn dfunctional_dgamma<T: DualNum<Primitive = f64> + Copy>(
     .eps
 }
 
-/// Residuals of the stationarity conditions: [∂F/∂Γ, X_i (1 + Σ_j ρ_j X_j Δ_ij(Γ)) - 1].
-#[expect(clippy::too_many_arguments)]
-fn residuals<T: DualNum<Primitive = f64> + Copy>(
-    gamma: T,
-    x: &[T],
-    rho: &[T],
+/// Starting values (Γ, X) of the Bernard-Blum iteration: stationary point of the functional F(Γ, X) with ∂F/∂X_i = 0
+/// (mass action law) and ∂F/∂Γ = 0 (bisection in Γ; the pairing term lowers Γ below the MSA value).
+fn starting_values(
+    rho: &[f64],
     z: &[f64],
-    d: &[T],
-    delta: T,
-    lb: T,
-    pre: &DMatrix<T>,
-) -> DVector<T> {
-    let n = rho.len();
-    let dm = strength(gamma, rho, z, d, delta, lb, pre);
-    let mut r = DVector::zeros(n + 1);
-    r[0] = dfunctional_dgamma(gamma, x, rho, z, d, delta, lb, pre);
-    for i in 0..n {
-        let s = (0..n).fold(T::zero(), |acc, j| acc + rho[j] * x[j] * dm[(i, j)]);
-        r[i + 1] = x[i] * (s + 1.0) - 1.0;
-    }
-    r
-}
-
-/// Reduced Helmholtz energy density of the BiMSA term. Returns (a / (kT V), Γ, fractions of non-paired ions X).
-pub fn bimsa<D: DualNum<Primitive = f64> + Copy>(input: &BiMsaInput<D>) -> (D, D, DVector<D>) {
-    if input.closure == BiMsaClosure::BernardBlum {
-        return bimsa_bernard_blum(input);
-    }
-    let BiMsaInput {
-        rho,
-        z,
-        d,
-        delta,
-        lb,
-        ..
-    } = *input;
-    let n = rho.len();
-    let sum_rho_z2 = rho
-        .iter()
-        .zip(z)
-        .fold(D::zero(), |acc, (&r, &z)| acc + r * z * z);
-    if sum_rho_z2.re() == 0.0 {
-        return (D::zero(), D::zero(), DVector::from_element(n, D::one()));
-    }
-    let pre = input.prefactor();
-    // real parts
-    let re = |v: &[D]| v.iter().map(|x| x.re()).collect::<Vec<f64>>();
-    let (rho_r, d_r) = (re(rho), re(d));
-    let (delta_r, lb_r) = (delta.re(), lb.re());
-    let pre_r = pre.map(|x| x.re());
-    let gamma_msa = screening_parameter(&rho_r, z, &d_r, lb_r, delta_r, sum_rho_z2.re());
+    d: &[f64],
+    delta: f64,
+    lb: f64,
+    pre: &DMatrix<f64>,
+    sum_rho_z2: f64,
+) -> (f64, DVector<f64>) {
+    let gamma_msa = screening_parameter(rho, z, d, lb, delta, sum_rho_z2);
     let solve_x = |gamma: f64| {
-        let dm = strength(gamma, &rho_r, z, &d_r, delta_r, lb_r, &pre_r);
-        non_paired_fractions(&DVector::from_column_slice(&rho_r), &dm)
+        let dm = strength(gamma, rho, z, d, delta, lb, pre);
+        non_paired_fractions(&DVector::from_column_slice(rho), &dm)
     };
     let h = |gamma: f64| {
         let x = solve_x(gamma);
         (
-            dfunctional_dgamma(gamma, x.as_slice(), &rho_r, z, &d_r, delta_r, lb_r, &pre_r),
+            dfunctional_dgamma(gamma, x.as_slice(), rho, z, d, delta, lb, pre),
             x,
         )
     };
-    // bracket: ∂F/∂Γ < 0 for Γ -> 0, > 0 for large Γ; Γ <= Γ_MSA (the pairing term lowers Γ)
+    // bracket: ∂F/∂Γ < 0 for Γ -> 0, > 0 for large Γ
     let (mut lo, mut hi) = (gamma_msa * 1e-6, gamma_msa);
     while h(hi).0 < 0.0 {
         hi *= 2.0;
@@ -238,40 +189,7 @@ pub fn bimsa<D: DualNum<Primitive = f64> + Copy>(input: &BiMsaInput<D>) -> (D, D
             break;
         }
     }
-    let x_r = h(gamma).1;
-
-    // joint Newton steps in D with the real Jacobian (central differences of the real residuals)
-    let m = n + 1;
-    let res_r = |v: &[f64]| residuals(v[0], &v[1..], &rho_r, z, &d_r, delta_r, lb_r, &pre_r);
-    let mut v0: Vec<f64> = std::iter::once(gamma).chain(x_r.iter().copied()).collect();
-    let jac = DMatrix::from_fn(m, m, |i, k| {
-        let hstep = 1e-7 * v0[k].abs().max(1e-12);
-        let mut vp = v0.clone();
-        let mut vm = v0.clone();
-        vp[k] += hstep;
-        vm[k] -= hstep;
-        (res_r(&vp)[i] - res_r(&vm)[i]) / (2.0 * hstep)
-    });
-    let Some(inv) = jac.try_inverse() else {
-        let nan = D::from(f64::NAN);
-        return (nan, nan, DVector::from_element(n, nan));
-    };
-    let mut v: Vec<D> = v0.drain(..).map(D::from).collect();
-    for _ in 0..EXTRA_ITERATIONS {
-        let r = residuals(v[0], &v[1..], rho, z, d, delta, lb, &pre);
-        let step: Vec<D> = (0..m)
-            .map(|i| (0..m).fold(D::zero(), |acc, k| acc + r[k] * inv[(i, k)]))
-            .collect();
-        for i in 0..m {
-            v[i] -= step[i];
-        }
-    }
-    let (gamma, x) = (v[0], DVector::from_column_slice(&v[1..]));
-    (
-        functional(gamma, x.as_slice(), rho, z, d, delta, lb, &pre),
-        gamma,
-        x,
-    )
+    (gamma, h(gamma).1)
 }
 
 /// Residuals of the Bernard-Blum equations for the unknowns v = [Γ, η, X_0, ..., X_(n-1)]: [Γ² - π λ_B (Σ_k ρ_k X'_k² +
@@ -356,12 +274,10 @@ fn bernard_blum_helmholtz<T: DualNum<Primitive = f64> + Copy>(
     a
 }
 
-/// BiMSA with the closure of Bernard and Blum ([BiMsaClosure::BernardBlum]). Returns (a / (kT V), Γ, X).
+/// Reduced Helmholtz energy density of the BiMSA term. Returns (a / (kT V), Γ, fractions of non-paired ions X).
 /// Newton iteration of the real parts (Jacobian by central differences, damped so that Γ > 0 and 0 < X <= 1),
-/// started from the variational solution, then Newton steps in the number type D with the real Jacobian.
-pub fn bimsa_bernard_blum<D: DualNum<Primitive = f64> + Copy>(
-    input: &BiMsaInput<D>,
-) -> (D, D, DVector<D>) {
+/// started from [starting_values], then Newton steps in the number type D with the real Jacobian.
+pub fn bimsa<D: DualNum<Primitive = f64> + Copy>(input: &BiMsaInput<D>) -> (D, D, DVector<D>) {
     let BiMsaInput {
         rho,
         z,
@@ -383,20 +299,7 @@ pub fn bimsa_bernard_blum<D: DualNum<Primitive = f64> + Copy>(
     let (rho_r, d_r) = (re(rho), re(d));
     let (delta_r, lb_r) = (delta.re(), lb.re());
     let pre_r = pre.map(|x| x.re());
-    let g_r = input.g.map(|x| x.re());
-    let f_r = input.f.map(|x| x.re());
-    let start = BiMsaInput {
-        rho: &rho_r,
-        z,
-        d: &d_r,
-        delta: delta_r,
-        lb: lb_r,
-        g: &g_r,
-        f: &f_r,
-        constant: input.constant,
-        closure: BiMsaClosure::Variational,
-    };
-    let (_, gamma0, x0) = bimsa(&start);
+    let (gamma0, x0) = starting_values(&rho_r, z, &d_r, delta_r, lb_r, &pre_r, sum_rho_z2.re());
     let eta0 = eta(gamma0, &rho_r, z, &d_r, delta_r);
     let mut v: Vec<f64> = [gamma0, eta0]
         .into_iter()
@@ -517,7 +420,7 @@ mod tests {
                 g: &self.g,
                 f: &self.f,
                 constant: PairingConstant::Bjerrum,
-                closure: BiMsaClosure::Variational,
+                shell_factor: 1.0,
             }
         }
     }
@@ -624,7 +527,7 @@ mod tests {
                 g: &g,
                 f: &f,
                 constant: PairingConstant::Bjerrum,
-                closure: BiMsaClosure::Variational,
+                shell_factor: Dual64::from(1.0),
             };
             let (a, _, _) = bimsa(&input);
             let h = 1e-7 * c.rho[k];
@@ -651,11 +554,12 @@ mod tests {
         assert!(gamma < g_msa);
     }
 
-    /// Bernard-Blum closure: equal to the variational form for ions of equal size and charge magnitude; the pair
-    /// densities enter η for unequal sizes (different result); exact density derivatives (dual numbers against
-    /// central differences).
+    /// Ions of equal size and charge magnitude: the solution equals the stationary point of the functional
+    /// ([starting_values]) and the Helmholtz energy its value; for unequal sizes the pairs enter η (different
+    /// result). Derivative with respect to the binding distance factor of the contact-shell constant against
+    /// central differences.
     #[test]
-    fn bernard_blum_closure() {
+    fn equal_sizes_and_shell_factor() {
         let lb = 7.1;
         let base = |d: Vec<f64>, rho: f64| Case {
             rho: vec![rho, rho],
@@ -667,59 +571,44 @@ mod tests {
         };
         for rho in [1e-4, 3e-3] {
             let c = base(vec![3.5, 3.5], rho);
-            let mut bb = c.input();
-            bb.closure = BiMsaClosure::BernardBlum;
-            let (a_v, g_v, x_v) = bimsa(&c.input());
-            let (a_b, g_b, x_b) = bimsa(&bb);
-            assert_relative_eq!(a_v, a_b, max_relative = 1e-11);
-            assert_relative_eq!(g_v, g_b, max_relative = 1e-11);
-            assert_relative_eq!(x_v[0], x_b[0], max_relative = 1e-11);
+            let input = c.input();
+            let pre = input.prefactor();
+            let s: f64 = c.rho.iter().zip(&c.z).map(|(r, z)| r * z * z).sum();
+            let (g0, x0) = starting_values(&c.rho, &c.z, &c.d, c.delta(), lb, &pre, s);
+            let f0 = functional(g0, x0.as_slice(), &c.rho, &c.z, &c.d, c.delta(), lb, &pre);
+            let (a, gamma, x) = bimsa(&input);
+            assert_relative_eq!(a, f0, max_relative = 1e-11);
+            assert_relative_eq!(gamma, g0, max_relative = 1e-11);
+            assert_relative_eq!(x[0], x0[0], max_relative = 1e-11);
             let c = base(vec![2.2, 4.8], rho);
-            let mut bb = c.input();
-            bb.closure = BiMsaClosure::BernardBlum;
-            assert!((bimsa(&c.input()).0 / bimsa(&bb).0 - 1.0).abs() > 1e-8);
+            let input = c.input();
+            let pre = input.prefactor();
+            let (g0, x0) = starting_values(&c.rho, &c.z, &c.d, c.delta(), lb, &pre, s);
+            let f0 = functional(g0, x0.as_slice(), &c.rho, &c.z, &c.d, c.delta(), lb, &pre);
+            assert!((bimsa(&input).0 / f0 - 1.0).abs() > 1e-8);
         }
         let c = mixture();
-        for k in 0..4 {
-            let rho_d: Vec<Dual64> = (0..4)
-                .map(|i| Dual64::new(c.rho[i], if i == k { 1.0 } else { 0.0 }))
-                .collect();
-            let d_d: Vec<Dual64> = c.d.iter().map(|&x| Dual64::from(x)).collect();
-            let delta = -rho_d
-                .iter()
-                .zip(&c.d)
-                .fold(Dual64::from(0.0), |acc, (&r, &d)| acc + r * d.powi(3))
-                * FRAC_PI_6
-                + 1.0;
+        let value = |theta: Dual64| {
+            let rho: Vec<Dual64> = c.rho.iter().map(|&x| Dual64::from(x)).collect();
+            let d: Vec<Dual64> = c.d.iter().map(|&x| Dual64::from(x)).collect();
             let (g, f) = (c.g.map(Dual64::from), c.f.map(Dual64::from));
             let input = BiMsaInput {
-                rho: &rho_d,
+                rho: &rho,
                 z: &c.z,
-                d: &d_d,
-                delta,
+                d: &d,
+                delta: Dual64::from(c.delta()),
                 lb: Dual64::from(c.lb),
                 g: &g,
                 f: &f,
-                constant: PairingConstant::Bjerrum,
-                closure: BiMsaClosure::BernardBlum,
+                constant: PairingConstant::Shell(1.034),
+                shell_factor: theta,
             };
-            let a = bimsa(&input).0;
-            let h = 1e-7 * c.rho[k];
-            let fd: Vec<f64> = [h, -h]
-                .iter()
-                .map(|&dh| {
-                    let mut r = c.rho.clone();
-                    r[k] += dh;
-                    let cc = Case {
-                        rho: r,
-                        ..mixture()
-                    };
-                    let mut inp = cc.input();
-                    inp.closure = BiMsaClosure::BernardBlum;
-                    bimsa(&inp).0
-                })
-                .collect();
-            assert_relative_eq!(a.eps, (fd[0] - fd[1]) / (2.0 * h), max_relative = 1e-6);
-        }
+            bimsa(&input).0
+        };
+        let theta = 1.034;
+        let h = 1e-6;
+        let fd =
+            (value(Dual64::from(theta + h)).re - value(Dual64::from(theta - h)).re) / (2.0 * h);
+        assert_relative_eq!(value(Dual64::new(theta, 1.0)).eps, fd, max_relative = 1e-6);
     }
 }

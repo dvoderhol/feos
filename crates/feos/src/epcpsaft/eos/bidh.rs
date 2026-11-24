@@ -7,7 +7,7 @@
 //!
 //! Δ_ij = exp(f_ij) K_ij g_ij y_ij,
 //!
-//! - K_ij: Bjerrum or Ebeling association constant ([PairingConstant]) with l = |z_i z_j| λ_B and the distance of closest
+//! - K_ij: Bjerrum, Ebeling or contact-shell association constant ([PairingConstant]) with l = |z_i z_j| λ_B and the distance of closest
 //!   approach d_ij = (d_i + d_j) / 2;
 //! - f_ij: logarithm of an adjustable factor (`ion_pairing` of the binary parameters; 0: Bjerrum constant);
 //! - g_ij: contact value of the hard-sphere mixture of all species (segments) at d_ij, the same expression as in
@@ -30,8 +30,9 @@ use std::f64::consts::PI;
 
 /// Reduced Helmholtz energy density of the BiDH term for the ions with densities `rho` (Å⁻³), charges `z`,
 /// diameters `d` (Å), contact values `g` of the hard-sphere mixture at (d_i + d_j)/2, logarithms of the pairing
-/// factors `f`, Bjerrum length `lb` (Å), association constant `constant` and factor β_mn of the dipole term
-/// `dipole_factor` (0: without). Returns (a / (kT V), fractions of non-paired ions X).
+/// factors `f`, Bjerrum length `lb` (Å), association constant `constant` with the binding distance factor
+/// `shell_factor` ([PairingConstant::constant]) and factor β_mn of the dipole term `dipole_factor` (0: without).
+/// Returns (a / (kT V), fractions of non-paired ions X).
 #[expect(clippy::too_many_arguments)]
 pub fn bidh<D: DualNum<Primitive = f64> + Copy>(
     rho: &[D],
@@ -41,11 +42,12 @@ pub fn bidh<D: DualNum<Primitive = f64> + Copy>(
     f: &DMatrix<D>,
     lb: D,
     constant: PairingConstant,
+    shell_factor: D,
     dipole_factor: f64,
 ) -> (D, DVector<D>) {
     let n = rho.len();
     let a_dh = debye_hueckel(rho, z, d, lb);
-    let delta = pairing_strength(rho, z, d, g, f, lb, constant, dipole_factor);
+    let delta = pairing_strength(rho, z, d, g, f, lb, constant, shell_factor, dipole_factor);
     let rho_v = DVector::from_column_slice(rho);
     if delta.iter().all(|x| x.re() == 0.0) {
         return (a_dh, DVector::from_element(n, D::one()));
@@ -64,6 +66,7 @@ pub fn pairing_strength<D: DualNum<Primitive = f64> + Copy>(
     f: &DMatrix<D>,
     lb: D,
     constant: PairingConstant,
+    shell_factor: D,
     dipole_factor: f64,
 ) -> DMatrix<D> {
     let n = rho.len();
@@ -75,7 +78,7 @@ pub fn pairing_strength<D: DualNum<Primitive = f64> + Copy>(
             return D::zero();
         }
         let dij = (d[i] + d[j]) * 0.5;
-        let k = constant.constant(lb * (z[i] * z[j]).abs(), dij);
+        let k = constant.constant(lb * (z[i] * z[j]).abs(), dij, shell_factor);
         if k.re() == 0.0 {
             return D::zero();
         }
@@ -176,7 +179,17 @@ mod tests {
     fn no_pairing_is_debye_hueckel() {
         let (rho, z, d, g, _) = setup(1.0);
         let f = DMatrix::from_element(4, 4, -200.0);
-        let (a, x) = bidh(&rho, &z, &d, &g, &f, 7.1, PairingConstant::Bjerrum, 0.0);
+        let (a, x) = bidh(
+            &rho,
+            &z,
+            &d,
+            &g,
+            &f,
+            7.1,
+            PairingConstant::Bjerrum,
+            1.0,
+            0.0,
+        );
         assert_relative_eq!(a, debye_hueckel(&rho, &z, &d, 7.1), max_relative = 1e-12);
         assert!(x.iter().all(|&x| (x - 1.0).abs() < 1e-12));
     }
@@ -188,7 +201,7 @@ mod tests {
         let (rho, z, d, _, f) = setup(1e-12);
         let g = DMatrix::from_element(4, 4, 1.0);
         let lb = 7.1;
-        let delta = pairing_strength(&rho, &z, &d, &g, &f, lb, PairingConstant::Bjerrum, 0.0);
+        let delta = pairing_strength(&rho, &z, &d, &g, &f, lb, PairingConstant::Bjerrum, 1.0, 0.0);
         let k = bjerrum_constant(lb * 4.0, (d[0] + d[1]) * 0.5);
         let kappa = (4.0
             * std::f64::consts::PI
@@ -218,6 +231,7 @@ mod tests {
             &f,
             lb,
             PairingConstant::Bjerrum,
+            1.0,
             0.0,
         )[(0, 1)];
         let high = pairing_strength(
@@ -228,6 +242,7 @@ mod tests {
             &f,
             lb,
             PairingConstant::Bjerrum,
+            1.0,
             0.0,
         )[(0, 1)];
         assert!(high < low);
@@ -258,6 +273,7 @@ mod tests {
                         &f.map(Dual64::from),
                         Dual64::from(lb),
                         constant,
+                        Dual64::from(1.034),
                         dipole,
                     );
                     let h = 1e-7 * rho[k];
@@ -265,8 +281,8 @@ mod tests {
                     let mut rm = rho.clone();
                     rp[k] += h;
                     rm[k] -= h;
-                    let fd = (bidh(&rp, &z, &d, &g, &f, lb, constant, dipole).0
-                        - bidh(&rm, &z, &d, &g, &f, lb, constant, dipole).0)
+                    let fd = (bidh(&rp, &z, &d, &g, &f, lb, constant, 1.034, dipole).0
+                        - bidh(&rm, &z, &d, &g, &f, lb, constant, 1.034, dipole).0)
                         / (2.0 * h);
                     assert_relative_eq!(a.eps, fd, max_relative = 1e-6);
                 }
