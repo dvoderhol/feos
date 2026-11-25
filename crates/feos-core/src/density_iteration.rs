@@ -120,6 +120,7 @@ where
 
     let maxiter = 50;
     let mut converged = false;
+    let mut last_newton_step = f64::INFINITY;
     'iteration: for k in 0..maxiter {
         let (_, mut p, mut dp_drho) = eos.p_dpdrho(temperature, rho, molefracs);
 
@@ -213,14 +214,20 @@ where
                     rho = (rho + 0.1 * maxdensity).min(maxdensity)
                 }
             }
+            last_newton_step = f64::INFINITY;
             continue 'iteration;
         }
         // Newton step
         rho += delta_rho;
+        last_newton_step = delta_rho;
         if error.abs() < f64::max(abstol, rho * reltol) {
             converged = true;
             break 'iteration;
         }
+    }
+    // the pressure tolerance can be below the rounding error of the pressure: accept a Newton step below 1e-12 rho
+    if !converged && last_newton_step.abs() < 1e-12 * rho {
+        converged = true;
     }
     if converged {
         Ok(rho)
