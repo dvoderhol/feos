@@ -3,7 +3,7 @@
 //! a / (kT V) = a_DH(ρ, d, λ_B) + Σ_i ρ_i (ln X_i - X_i / 2 + 1/2),
 //!
 //! with the Debye-Hückel term of all ions (paired or not; [debye_hueckel]) and the pairing of one site per ion
-//! ([non_paired_fractions]) with the association strength of a cation i and an anion j
+//! ([non_paired_fractions]) with the association strength of a cation i and an anion j (evaluated as ln Δ_ij)
 //!
 //! Δ_ij = exp(f_ij) K_ij g_ij y_ij,
 //!
@@ -22,7 +22,9 @@
 //!
 //! The terms of the publication are used in the corrected forms (association term with the sign of Wertheim's
 //! theory, Debye-Hückel chemical potential derived from a_DH).
-use super::ion_pairing::{PairingConstant, non_paired_fractions, pairing_helmholtz_energy_density};
+use super::ion_pairing::{
+    PairingConstant, PairingStrengths, non_paired_fractions, pairing_helmholtz_energy_density,
+};
 use super::ionic::{debye_hueckel, debye_hueckel_chemical_potential};
 use nalgebra::{DMatrix, DVector};
 use num_dual::DualNum;
@@ -47,18 +49,22 @@ pub fn bidh<D: DualNum<Primitive = f64> + Copy>(
 ) -> (D, DVector<D>) {
     let n = rho.len();
     let a_dh = debye_hueckel(rho, z, d, lb);
-    let delta = pairing_strength(rho, z, d, g, f, lb, constant, shell_factor, dipole_factor);
-    let rho_v = DVector::from_column_slice(rho);
-    if delta.iter().all(|x| x.re() == 0.0) {
+    let strengths = pairing_strengths(rho, z, d, g, f, lb, constant, shell_factor, dipole_factor);
+    if strengths.pairs.is_empty() {
         return (a_dh, DVector::from_element(n, D::one()));
     }
-    let x = non_paired_fractions(&rho_v, &delta);
-    (a_dh + pairing_helmholtz_energy_density(&rho_v, &x), x)
+    let rho_v = DVector::from_column_slice(rho);
+    let (x, ln_x) = non_paired_fractions(&rho_v, &strengths);
+    (
+        a_dh + pairing_helmholtz_energy_density(&rho_v, &x, &ln_x),
+        x,
+    )
 }
 
-/// Association strengths Δ_ij (Å³) of the BiDH term (zero for ions of the same charge sign).
+/// Association strengths of the BiDH term as ln Δ_ij = f_ij + ln K_ij + ln g_ij + ln y_ij for every cation-anion
+/// pair with K_ij > 0 (Δ = 0 for ions of the same charge sign).
 #[expect(clippy::too_many_arguments)]
-pub fn pairing_strength<D: DualNum<Primitive = f64> + Copy>(
+pub fn pairing_strengths<D: DualNum<Primitive = f64> + Copy>(
     rho: &[D],
     z: &[f64],
     d: &[D],
@@ -68,28 +74,36 @@ pub fn pairing_strength<D: DualNum<Primitive = f64> + Copy>(
     constant: PairingConstant,
     shell_factor: D,
     dipole_factor: f64,
-) -> DMatrix<D> {
+) -> PairingStrengths<D> {
     let n = rho.len();
     let mu: Vec<D> = (0..n)
         .map(|i| debye_hueckel_chemical_potential(z[i], d[i], rho, z, d, lb))
         .collect();
-    DMatrix::from_fn(n, n, |i, j| {
-        if z[i] * z[j] >= 0.0 {
-            return D::zero();
+    let mut ln_delta = DMatrix::zeros(n, n);
+    let mut pairs = Vec::new();
+    for i in 0..n {
+        for j in i + 1..n {
+            if z[i] * z[j] >= 0.0 {
+                continue;
+            }
+            let dij = (d[i] + d[j]) * 0.5;
+            let Some(ln_k) = constant.ln_constant(lb * (z[i] * z[j]).abs(), dij, shell_factor)
+            else {
+                continue;
+            };
+            let mu_pair = debye_hueckel_chemical_potential(z[i] + z[j], dij, rho, z, d, lb);
+            let mu_di = if dipole_factor == 0.0 {
+                D::zero()
+            } else {
+                dipole_chemical_potential(z[i], z[j], dij, rho, z, lb, dipole_factor)
+            };
+            let v = f[(i, j)] + ln_k + g[(i, j)].ln() + mu[i] + mu[j] - mu_pair - mu_di;
+            ln_delta[(i, j)] = v;
+            ln_delta[(j, i)] = v;
+            pairs.push((i, j));
         }
-        let dij = (d[i] + d[j]) * 0.5;
-        let k = constant.constant(lb * (z[i] * z[j]).abs(), dij, shell_factor);
-        if k.re() == 0.0 {
-            return D::zero();
-        }
-        let mu_pair = debye_hueckel_chemical_potential(z[i] + z[j], dij, rho, z, d, lb);
-        let mu_di = if dipole_factor == 0.0 {
-            D::zero()
-        } else {
-            dipole_chemical_potential(z[i], z[j], dij, rho, z, lb, dipole_factor)
-        };
-        f[(i, j)].exp() * k * g[(i, j)] * (mu[i] + mu[j] - mu_pair - mu_di).exp()
-    })
+    }
+    PairingStrengths { ln_delta, pairs }
 }
 
 /// Below this value of κσ, the integral of [dipole_chemical_potential] is evaluated from its series.
@@ -201,7 +215,9 @@ mod tests {
         let (rho, z, d, _, f) = setup(1e-12);
         let g = DMatrix::from_element(4, 4, 1.0);
         let lb = 7.1;
-        let delta = pairing_strength(&rho, &z, &d, &g, &f, lb, PairingConstant::Bjerrum, 1.0, 0.0);
+        let strengths =
+            pairing_strengths(&rho, &z, &d, &g, &f, lb, PairingConstant::Bjerrum, 1.0, 0.0);
+        let delta = strengths.ln_delta.map(f64::exp);
         let k = bjerrum_constant(lb * 4.0, (d[0] + d[1]) * 0.5);
         let kappa = (4.0
             * std::f64::consts::PI
@@ -215,7 +231,7 @@ mod tests {
         );
         assert_relative_eq!(delta[(0, 1)], k, max_relative = 1e-4);
         // same-sign pairs do not associate
-        assert_eq!(delta[(0, 2)], 0.0);
+        assert!(!strengths.pairs.contains(&(0, 2)));
     }
 
     /// Screening reduces pairing: Δ decreases with the ionic strength.
@@ -223,7 +239,7 @@ mod tests {
     fn screening_reduces_pairing() {
         let (_, z, d, g, f) = setup(1.0);
         let lb = 7.1;
-        let low = pairing_strength(
+        let low = pairing_strengths(
             &setup(0.01).0,
             &z,
             &d,
@@ -233,8 +249,9 @@ mod tests {
             PairingConstant::Bjerrum,
             1.0,
             0.0,
-        )[(0, 1)];
-        let high = pairing_strength(
+        )
+        .ln_delta[(0, 1)];
+        let high = pairing_strengths(
             &setup(1.0).0,
             &z,
             &d,
@@ -244,7 +261,8 @@ mod tests {
             PairingConstant::Bjerrum,
             1.0,
             0.0,
-        )[(0, 1)];
+        )
+        .ln_delta[(0, 1)];
         assert!(high < low);
     }
 
