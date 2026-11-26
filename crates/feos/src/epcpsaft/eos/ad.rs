@@ -411,7 +411,7 @@ mod tests {
         EPcpSaft::new(EPcpSaftParameters::from_json(
             vec!["water", "acetone", "methanol"],
             "../../parameters/epcpsaft/esper2023.json",
-            Some("../../parameters/epcpsaft/rehner2023_binary.json"),
+            Some("../../parameters/pcsaft/rehner2023_binary.json"),
             IdentifierOption::Name,
         )?)
     }

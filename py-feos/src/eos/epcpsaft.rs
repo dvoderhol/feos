@@ -1,15 +1,9 @@
 use super::PyEquationOfState;
-#[cfg(feature = "dft")]
-use crate::dft::{PyAssociationVersion, PyFMTVersion, PyHelmholtzEnergyFunctional};
 use crate::error::PyFeosError;
 use crate::ideal_gas::IdealGasModel;
-#[cfg(feature = "dft")]
-use crate::parameter::PyParameters;
 use crate::parameter::PyParametersOrGcParameters;
 use crate::residual::ResidualModel;
 use crate::state::PyState;
-#[cfg(feature = "dft")]
-use feos::epcpsaft::EPcpSaftFunctional;
 use feos::epcpsaft::{
     BornDiameter, DQVariants, EPcpSaft, EPcpSaftOptions, EPcpSaftVariants, MsaPacking,
     PairingConstant,
@@ -218,67 +212,6 @@ impl PyEquationOfState {
         );
         let ideal_gas = vec![IdealGasModel::NoModel; residual.components()];
         Ok(Self(Arc::new(EquationOfState::new(ideal_gas, residual))))
-    }
-}
-
-#[cfg(feature = "dft")]
-#[pymethods]
-impl PyHelmholtzEnergyFunctional {
-    /// ePCP-SAFT Helmholtz energy functional (systems without ions only).
-    ///
-    /// Parameters
-    /// ----------
-    /// parameters: Parameters
-    ///     The set of ePCP-SAFT parameters.
-    /// fmt_version: FMTVersion, optional
-    ///     The specific variant of the FMT term. Defaults to FMTVersion.WhiteBear
-    /// association_version: AssociationVersion, optional
-    ///     The version of the association functional. Defaults to AssociationVersion.ISaft
-    /// max_eta : float, optional
-    ///     Maximum packing fraction. Defaults to 0.5.
-    /// max_iter_cross_assoc : unsigned integer, optional
-    ///     Maximum number of iterations for cross association. Defaults to 50.
-    /// tol_cross_assoc : float
-    ///     Tolerance for convergence of cross association. Defaults to 1e-10.
-    /// dq_variant : "dq35" | "dq44", optional
-    ///     Combination rule used in the dipole/quadrupole term. Defaults to "dq35"
-    ///
-    /// Returns
-    /// -------
-    /// HelmholtzEnergyFunctional
-    #[staticmethod]
-    #[pyo3(
-        signature = (parameters, fmt_version=PyFMTVersion::WhiteBear, association_version=PyAssociationVersion::ISaft, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35")
-    )]
-    fn epcpsaft(
-        parameters: PyParameters,
-        fmt_version: PyFMTVersion,
-        association_version: PyAssociationVersion,
-        max_eta: f64,
-        max_iter_cross_assoc: usize,
-        tol_cross_assoc: f64,
-        dq_variant: &str,
-    ) -> PyResult<PyEquationOfState> {
-        let options = EPcpSaftOptions {
-            max_eta,
-            max_iter_cross_assoc,
-            tol_cross_assoc,
-            dq_variant: self::dq_variant(dq_variant)?,
-            ..Default::default()
-        };
-        let func = ResidualModel::EPcpSaftFunctional(
-            EPcpSaftFunctional::with_options(
-                parameters.try_convert()?,
-                fmt_version.into(),
-                association_version.into(),
-                options,
-            )
-            .map_err(PyFeosError::from)?,
-        );
-        let ideal_gas = vec![IdealGasModel::NoModel; func.components()];
-        Ok(PyEquationOfState(Arc::new(EquationOfState::new(
-            ideal_gas, func,
-        ))))
     }
 }
 

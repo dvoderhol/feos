@@ -57,7 +57,7 @@ multiparameter = ["feos/multiparameter"]
 rayon = ["dep:rayon", "ndarray/rayon", "feos-core/rayon", "feos-dft?/rayon"]
 # Loading parameters from a sqlite database. Not active for emscripten wheel.
 sqlite = ["feos-core/rusqlite"]
-ad = ["feos/pcsaft", "feos/epcpsaft"]
+ad = ["feos/pcsaft"]
 # Embed introspection data for type stub generation (`maturin generate-stubs`).
 experimental-inspect = [
     "pyo3/experimental-inspect",

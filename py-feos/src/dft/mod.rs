@@ -1,7 +1,7 @@
 use crate::eos::{PyEquationOfState, parse_molefracs};
 use crate::ideal_gas::IdealGasModel;
 use crate::residual::ResidualModel;
-#[cfg(any(feature = "pcsaft", feature = "gc_pcsaft", feature = "epcpsaft"))]
+#[cfg(any(feature = "pcsaft", feature = "gc_pcsaft"))]
 use feos::association::AssociationVersion;
 use feos::hard_sphere::{FMTFunctional, FMTVersion};
 use feos_core::{EquationOfState, ResidualDyn};
@@ -88,7 +88,7 @@ impl From<PyFMTVersion> for FMTVersion {
 }
 
 /// Different versions of the association functional.
-#[cfg(any(feature = "pcsaft", feature = "gc_pcsaft", feature = "epcpsaft"))]
+#[cfg(any(feature = "pcsaft", feature = "gc_pcsaft"))]
 #[derive(Clone, Copy, PartialEq)]
 #[pyclass(name = "AssociationVersion", eq, eq_int, from_py_object)]
 pub enum PyAssociationVersion {
@@ -100,7 +100,7 @@ pub enum PyAssociationVersion {
     ISaft,
 }
 
-#[cfg(any(feature = "pcsaft", feature = "gc_pcsaft", feature = "epcpsaft"))]
+#[cfg(any(feature = "pcsaft", feature = "gc_pcsaft"))]
 impl From<AssociationVersion> for PyAssociationVersion {
     fn from(association_version: AssociationVersion) -> Self {
         match association_version {
@@ -111,7 +111,7 @@ impl From<AssociationVersion> for PyAssociationVersion {
     }
 }
 
-#[cfg(any(feature = "pcsaft", feature = "gc_pcsaft", feature = "epcpsaft"))]
+#[cfg(any(feature = "pcsaft", feature = "gc_pcsaft"))]
 impl From<PyAssociationVersion> for AssociationVersion {
     fn from(association_version: PyAssociationVersion) -> Self {
         match association_version {

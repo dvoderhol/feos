@@ -184,10 +184,7 @@ mod feos {
     #[pymodule_export]
     use super::ad::{PyBinaryDataset, PyEquationOfStateAD, PyPropertyAD, PyPureDataset};
 
-    #[cfg(all(
-        feature = "dft",
-        any(feature = "pcsaft", feature = "gc_pcsaft", feature = "epcpsaft")
-    ))]
+    #[cfg(all(feature = "dft", any(feature = "pcsaft", feature = "gc_pcsaft")))]
     #[pymodule_export]
     use super::dft::PyAssociationVersion;
     #[cfg(all(feature = "dft", feature = "rayon"))]

@@ -13,9 +13,8 @@ All PCP-SAFT parameters are identical to the files in [`../pcsaft`](../pcsaft). 
 
 ## Binary Parameters
 
-| file | description | publication(s) |
-| - | - | :-: |
-| [`rehner2023_binary.json`](rehner2023_binary.json) | identical copy of [`../pcsaft/rehner2023_binary.json`](../pcsaft/rehner2023_binary.json) | [&#128279;](https://doi.org/10.1007/s10765-023-03290-3) |
+The binary parameters of PCP-SAFT, e.g. [`../pcsaft/rehner2023_binary.json`](../pcsaft/rehner2023_binary.json), are read
+unchanged.
 
 ## Permittivity Parameters
 

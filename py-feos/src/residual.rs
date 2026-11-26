@@ -19,7 +19,7 @@ use quantity::*;
 #[cfg_attr(feature = "dft", derive(HelmholtzEnergyFunctionalDyn))]
 #[derive(ResidualDyn, Subset)]
 #[cfg_attr(
-    not(all(feature = "dft", feature = "epcpsaft")),
+    not(all(feature = "pcsaft", feature = "epcpsaft")),
     expect(clippy::large_enum_variant)
 )]
 pub enum ResidualModel {
@@ -80,17 +80,6 @@ pub enum ResidualModel {
     )]
     PcSaftFunctional(feos::pcsaft::PcSaftFunctional),
 
-    #[cfg(all(feature = "dft", feature = "epcpsaft"))]
-    #[implement(
-        molar_weight,
-        parameter_info,
-        functional,
-        association,
-        fluid_parameters,
-        pair_potential
-    )]
-    EPcpSaftFunctional(feos::epcpsaft::EPcpSaftFunctional),
-
     #[cfg(all(feature = "dft", feature = "gc_pcsaft"))]
     #[implement(molar_weight, functional, bond_lengths, association, fluid_parameters)]
     GcPcSaftFunctional(feos::gc_pcsaft::GcPcSaftFunctional),
@@ -125,8 +114,6 @@ pub enum ResidualModel {
 pub enum FunctionalContributionVariant<'a> {
     #[cfg(feature = "pcsaft")]
     PcSaftFunctional(feos::pcsaft::PcSaftFunctionalContribution<'a>),
-    #[cfg(feature = "epcpsaft")]
-    EPcpSaftFunctional(feos::epcpsaft::EPcpSaftFunctionalContribution<'a>),
     #[cfg(feature = "gc_pcsaft")]
     GcPcSaftFunctional(feos::gc_pcsaft::GcPcSaftFunctionalContribution<'a>),
     #[cfg(feature = "pets")]
