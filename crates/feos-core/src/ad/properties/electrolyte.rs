@@ -81,7 +81,7 @@ impl ReactionEquilibrium {
 /// composition.
 pub struct ElectrolyteProperties<D> {
     /// Natural logarithm of the solvent activity $\ln a_s = \ln x_s + \ln\varphi_s - \ln\varphi_s^0$
-    /// (fugacity coefficients referred to the given pressure, see [ln_phi_at]).
+    /// (fugacity coefficients referred to the given pressure, see `ln_phi_at`).
     pub ln_solvent_activity: D,
     /// Natural logarithm of the activity coefficients in the mole-fraction scale: solutes with
     /// the reference state of infinite dilution in the pure solvent,
@@ -254,11 +254,21 @@ fn reference_enthalpies<E: Residual<Dyn, D>, D: DualNum<Primitive = f64, Inner =
     dln_phi_dt.map(|d| d * (-rgas * t * t))
 }
 
-/// Liquid state at the amounts `moles` (mol). At high ion concentrations the density iteration
-/// started from the default liquid density can fail although a liquid solution exists; then it is
-/// started from the density of the pure solvent `rho_solvent` (reduced) scaled by the ratio of the
-/// total amount to the amount of solvent, and from decreasing fractions of that density (for
-/// concentrated solutions of large ions the liquid density can be about 0.3 of this estimate).
+/// Density relative to the estimate of [liquid] from which a root is accepted without further starts.
+const MIN_LIQUID_DENSITY_RATIO: f64 = 0.25;
+/// Density relative to the estimate of [liquid] below which a root is not a liquid and is not used.
+const MIN_ROOT_DENSITY_RATIO: f64 = 0.1;
+
+/// Liquid state at the amounts `moles` (mol). The density iteration is started from the default
+/// liquid density and then from the density of the pure solvent `rho_solvent` (reduced) scaled by
+/// the ratio of the total amount to the amount of solvent, rho_est, and from decreasing fractions of
+/// it (for concentrated solutions of large ions the liquid density can be about 0.3 of rho_est).
+/// Only mechanically stable roots (dp/drho > 0) with a density of at least MIN_ROOT_DENSITY_RATIO rho_est
+/// are used (expanded, gas-like roots of the isotherm are not liquids). The first root with a density of
+/// at least MIN_LIQUID_DENSITY_RATIO rho_est is returned; otherwise all starts are used and the densest
+/// root is returned, so that where the isotherm has several roots the liquid root is selected
+/// independently of which start reaches it. dp/drho is evaluated with the real-valued model and does
+/// not use the derivatives cached in the state. Error if no start gives such a root.
 fn liquid<E: Residual<Dyn, D>, D: DualNum<Primitive = f64, Inner = f64> + Copy>(
     eos: &E,
     t: f64,
@@ -271,17 +281,42 @@ fn liquid<E: Residual<Dyn, D>, D: DualNum<Primitive = f64, Inner = f64> + Copy>(
     let pressure = Pressure::from_inner(&(p * PASCAL));
     let n_total = moles.sum();
     let x = moles / n_total;
+    let x_re = x.map(|v| v.re());
+    let t_reduced = (t * KELVIN).into_reduced();
+    let eos_re = eos.re();
     let composition = || (x.clone(), Moles::new(n_total));
-    let mut state = State::new_npt(eos, temperature, pressure, composition(), Some(Liquid));
-    let rho = rho_solvent / x[solvent].re();
-    for f in [1.0, 0.75, 0.5, 0.35, 0.25] {
-        if state.is_ok() {
-            break;
+    let rho = rho_solvent / x_re[solvent];
+    let starts = std::iter::once(Liquid).chain(
+        [1.0, 0.75, 0.5, 0.35, 0.25].map(|f| InitialDensity(Density::from_reduced(f * rho))),
+    );
+    let mut densest: Option<(f64, State<E, Dyn, D>)> = None;
+    let mut error = None;
+    for start in starts {
+        match State::new_npt(eos, temperature, pressure, composition(), Some(start)) {
+            Ok(state) => {
+                let density = state.density.into_reduced().re();
+                let (_, _, dp_drho) = eos_re.p_dpdrho(t_reduced, density, &x_re);
+                if dp_drho <= 0.0 || density < MIN_ROOT_DENSITY_RATIO * rho {
+                    error = Some(FeosError::IterationFailed(format!(
+                        "liquid state: root of density {density} (reduced, estimate {rho}) with dp/drho = \
+                         {dp_drho}"
+                    )));
+                    continue;
+                }
+                if density >= MIN_LIQUID_DENSITY_RATIO * rho {
+                    return Ok(state);
+                }
+                if densest.as_ref().is_none_or(|(d, _)| density > *d) {
+                    densest = Some((density, state));
+                }
+            }
+            Err(e) => error = Some(e),
         }
-        let init = InitialDensity(Density::from_reduced(f * rho));
-        state = State::new_npt(eos, temperature, pressure, composition(), Some(init));
     }
-    state
+    match densest {
+        Some((_, state)) => Ok(state),
+        None => Err(error.unwrap()),
+    }
 }
 
 /// Chemical equilibrium of the solution: extents xi of the reactions with
@@ -481,4 +516,45 @@ fn equilibrium<E: Residual<Dyn, D>, D: DualNum<Primitive = f64, Inner = f64> + C
         moles,
         extents,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cubic::{PengRobinson, PengRobinsonParameters};
+    use nalgebra::dvector;
+
+    /// Below the critical temperature the liquid root is returned; above it the only root is gas-like and
+    /// no state is returned.
+    #[test]
+    fn liquid_root_selection() -> FeosResult<()> {
+        let parameters =
+            PengRobinsonParameters::new_simple(&[647.096], &[22.064e6], &[0.3443], &[18.015268])?;
+        let eos = &PengRobinson::new(parameters);
+        let moles = dvector![55.5];
+        let state = liquid(&eos, 300.0, 1e5, &moles, 0, 0.0)?;
+        let rho = state.density.into_reduced();
+        assert!(state.dp_drho(Contributions::Total).into_reduced() > 0.0);
+        let liquid_state = liquid(&eos, 300.0, 1e5, &moles, 0, rho)?;
+        assert_eq!(liquid_state.density.into_reduced(), rho);
+        assert!(liquid(&eos, 700.0, 1e5, &moles, 0, rho).is_err());
+        // vapor root and (metastable) liquid root below the vapor pressure: with an estimate five times the
+        // liquid density no root is accepted early, all starts are used and the denser root is returned
+        let reference = liquid(&eos, 373.15, 5e4, &moles, 0, rho)?
+            .density
+            .into_reduced();
+        let vapor = State::new_npt(
+            &eos,
+            Temperature::from_inner(&(373.15 * KELVIN)),
+            Pressure::from_inner(&(5e4 * PASCAL)),
+            (dvector![1.0], Moles::new(55.5)),
+            Some(crate::DensityInitialization::Vapor),
+        )?
+        .density
+        .into_reduced();
+        assert!(vapor < 1e-2 * reference);
+        let densest = liquid(&eos, 373.15, 5e4, &moles, 0, 5.0 * reference)?;
+        assert_eq!(densest.density.into_reduced(), reference);
+        Ok(())
+    }
 }
