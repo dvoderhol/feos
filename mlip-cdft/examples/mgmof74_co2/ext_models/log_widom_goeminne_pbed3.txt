@@ -1,3 +1,0 @@
-/local/home/dvoderhol/feos/mlip-cdft/feos_mlip/engine_nequip.py:105: UserWarning: host cell perpendicular widths [13.18 13.18 13.18] A < 22.3 A (receptive field 4 x 5.0 A + guest size): guest images can interact
-  warnings.warn(f"host cell perpendicular widths {np.round(widths, 2)} A < {need:.1f} A (receptive field "
-goeminne_pbed3: Widom 500000 insertions (534 s): K_H = 3.2949e-04 +- 2.47e-05 mol/(kg Pa) (paper overlap rule)
