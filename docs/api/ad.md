@@ -85,7 +85,9 @@ multiplied by exp(`ion_pairing`) of the binary record of i and j (default 0). `b
 Naseri Boroujeni et al. 2023; 0: without) includes the interaction of the dipole of the ion pairs with the ionic
 atmosphere in BiDH. BiMSA uses the equations of Bernard and Blum (1996) with the pairs in the asymmetry parameter.
 `permittivity_offset` (at most 12 coefficients c_k) adds sum_k c_k tau^k, tau = (T/K - 298.15)/100, to the relative
-permittivity. Rows are evaluated in parallel.
+permittivity; with `permittivity_offset_density` (coefficients d_k of rho_ref(T) = sum_k d_k tau^k in 1/A^3) the offset
+is multiplied by rho_c / rho_ref(T), rho_c the density of the component `permittivity_offset_component` (default 0).
+Rows are evaluated in parallel.
 
 ## Examples
 The following example calculates pure-component vapor pressures including their derivatives with respect to the core PC-SAFT parameters for 10 Million temperatures in merely two seconds.

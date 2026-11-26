@@ -109,7 +109,8 @@ impl PyPropertyAD {
     ///     Defaults to that of water.
     /// max_eta, max_iter_cross_assoc, tol_cross_assoc, dq_variant, epcpsaft_variant, msa_packing,
     /// born_delta_cation, born_delta_anion, born_diameter, dh_delta, ion_pairing_constant,
-    /// ion_pairing_shell, bidh_dipole_factor, permittivity_offset : optional
+    /// ion_pairing_shell, bidh_dipole_factor, permittivity_offset, permittivity_offset_density,
+    /// permittivity_offset_component : optional
     ///     Options of the equation of state, see `EquationOfState.epcpsaft`.
     ///
     /// Returns
@@ -125,7 +126,7 @@ impl PyPropertyAD {
     ///     not converge are NaN. The status is True for rows whose calculation returned without
     ///     error; their values are NaN where an iteration inside the model did not converge.
     #[staticmethod]
-    #[pyo3(signature = (parameters, derivatives, input, solvent=0, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", epcpsaft_variant="dh", msa_packing="ions", born_delta_cation=0.0, born_delta_anion=0.0, born_diameter="hs", dh_delta=0.0, ion_pairing_constant="shell", ion_pairing_shell=1.034, bidh_dipole_factor=0.25, permittivity_offset=vec![], reactions=vec![], solvent_molar_mass=0.018015268))]
+    #[pyo3(signature = (parameters, derivatives, input, solvent=0, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", epcpsaft_variant="dh", msa_packing="ions", born_delta_cation=0.0, born_delta_anion=0.0, born_diameter="hs", dh_delta=0.0, ion_pairing_constant="shell", ion_pairing_shell=1.034, bidh_dipole_factor=0.25, permittivity_offset=vec![], permittivity_offset_density=vec![], permittivity_offset_component=0, reactions=vec![], solvent_molar_mass=0.018015268))]
     #[expect(clippy::too_many_arguments)]
     pub fn electrolyte_properties_derivatives<'py>(
         py: Python<'py>,
@@ -147,6 +148,8 @@ impl PyPropertyAD {
         ion_pairing_shell: f64,
         bidh_dipole_factor: f64,
         permittivity_offset: Vec<f64>,
+        permittivity_offset_density: Vec<f64>,
+        permittivity_offset_component: usize,
         reactions: Vec<ReactionInput>,
         solvent_molar_mass: f64,
     ) -> PyResult<ElectrolyteResult<'py>> {
@@ -165,6 +168,8 @@ impl PyPropertyAD {
             ion_pairing_shell,
             bidh_dipole_factor,
             permittivity_offset,
+            permittivity_offset_density,
+            permittivity_offset_component,
         )?;
         let parameters = parameters.try_convert()?;
         let model =

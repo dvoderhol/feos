@@ -42,6 +42,8 @@ pub(crate) fn epcpsaft_options(
     ion_pairing_shell: f64,
     bidh_dipole_factor: f64,
     permittivity_offset: Vec<f64>,
+    permittivity_offset_density: Vec<f64>,
+    permittivity_offset_component: usize,
 ) -> PyResult<EPcpSaftOptions> {
     let born_diameter = match born_diameter {
         "hs" => BornDiameter::HardSphere,
@@ -69,6 +71,14 @@ pub(crate) fn epcpsaft_options(
     }
     let mut offset = [0.0; 12];
     offset[..permittivity_offset.len()].copy_from_slice(&permittivity_offset);
+    if permittivity_offset_density.len() > 12 {
+        return Err(PyErr::new::<PyValueError, _>(
+            "permittivity_offset_density: at most 12 coefficients",
+        ));
+    }
+    let mut offset_density = [0.0; 12];
+    offset_density[..permittivity_offset_density.len()]
+        .copy_from_slice(&permittivity_offset_density);
     let msa_packing = match msa_packing {
         "ions" => MsaPacking::Ions,
         "total" => MsaPacking::Total,
@@ -92,6 +102,8 @@ pub(crate) fn epcpsaft_options(
         ion_pairing_constant,
         bidh_dipole_factor,
         permittivity_offset: offset,
+        permittivity_offset_density: offset_density,
+        permittivity_offset_component,
     })
 }
 
@@ -157,6 +169,12 @@ impl PyEquationOfState {
     /// permittivity_offset : list[float], optional
     ///     Coefficients c_k (at most 12) of the offset sum_k c_k tau^k, tau = (T/K - 298.15)/100, added to
     ///     the relative permittivity. Defaults to no offset.
+    /// permittivity_offset_density : list[float], optional
+    ///     Coefficients d_k (at most 12) of the reference density rho_ref(T) = sum_k d_k tau^k in 1/A^3 of the
+    ///     component `permittivity_offset_component`; the offset is multiplied by rho_c / rho_ref(T).
+    ///     Defaults to no scaling.
+    /// permittivity_offset_component : int, optional
+    ///     Index of the (neutral) component whose density rho_c scales the offset. Defaults to 0.
     ///
     /// Returns
     /// -------
@@ -165,7 +183,7 @@ impl PyEquationOfState {
     ///     states.
     #[staticmethod]
     #[pyo3(
-        signature = (parameters, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", epcpsaft_variant="dh", msa_packing="ions", born_delta_cation=0.0, born_delta_anion=0.0, born_diameter="hs", dh_delta=0.0, ion_pairing_constant="shell", ion_pairing_shell=1.034, bidh_dipole_factor=0.25, permittivity_offset=vec![])
+        signature = (parameters, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", epcpsaft_variant="dh", msa_packing="ions", born_delta_cation=0.0, born_delta_anion=0.0, born_diameter="hs", dh_delta=0.0, ion_pairing_constant="shell", ion_pairing_shell=1.034, bidh_dipole_factor=0.25, permittivity_offset=vec![], permittivity_offset_density=vec![], permittivity_offset_component=0)
     )]
     #[expect(clippy::too_many_arguments)]
     pub fn epcpsaft(
@@ -184,6 +202,8 @@ impl PyEquationOfState {
         ion_pairing_shell: f64,
         bidh_dipole_factor: f64,
         permittivity_offset: Vec<f64>,
+        permittivity_offset_density: Vec<f64>,
+        permittivity_offset_component: usize,
     ) -> PyResult<Self> {
         let options = epcpsaft_options(
             max_eta,
@@ -200,6 +220,8 @@ impl PyEquationOfState {
             ion_pairing_shell,
             bidh_dipole_factor,
             permittivity_offset,
+            permittivity_offset_density,
+            permittivity_offset_component,
         )?;
         let parameters = match parameters {
             PyParametersOrGcParameters::Parameters(parameters) => parameters.try_convert(),

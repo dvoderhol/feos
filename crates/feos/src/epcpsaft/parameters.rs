@@ -254,7 +254,7 @@ pub type EPcpSaftParameters =
 ///
 /// All model parameters are of the generic type `D` (`f64` or a dual number for derivatives
 /// with respect to model parameters). `m` to `shell_factor` are the adjustable parameters,
-/// `mu2` to `e_k_ij` are derived from them, the remaining fields (and `permittivity_offset`) describe the structure.
+/// `mu2` to `e_k_ij` are derived from them, the remaining fields (and the `permittivity_offset` fields) describe the structure.
 #[derive(Clone, Debug)]
 pub struct EPcpSaftPars<D = f64> {
     pub m: DVector<D>,
@@ -278,6 +278,11 @@ pub struct EPcpSaftPars<D = f64> {
     pub shell_factor: D,
     /// coefficients c_k of the additive permittivity offset Σ_k c_k τ^k, τ = (T/K - 298.15)/100
     pub permittivity_offset: [f64; 12],
+    /// coefficients d_k of the reference density Σ_k d_k τ^k (1/Å³) of the component `permittivity_offset_component`
+    /// that scales the permittivity offset; all zero: offset not scaled
+    pub permittivity_offset_density: [f64; 12],
+    /// component whose density scales the permittivity offset
+    pub permittivity_offset_component: usize,
     /// base of the Born diameter of the ions: `sigma` if true, hard-sphere diameter otherwise
     pub born_sigma: bool,
     pub mu2: DVector<D>,
@@ -391,6 +396,8 @@ impl EPcpSaftPars {
                 dh_delta: 0.0,
                 shell_factor: 0.0,
                 permittivity_offset: [0.0; 12],
+                permittivity_offset_density: [0.0; 12],
+                permittivity_offset_component: 0,
                 born_sigma: false,
                 mu2: DVector::zeros(0),
                 q2: DVector::zeros(0),
@@ -471,6 +478,8 @@ impl<D: DualNum<Primitive = f64> + Copy> EPcpSaftPars<D> {
             dh_delta,
             shell_factor,
             permittivity_offset: structure.permittivity_offset,
+            permittivity_offset_density: structure.permittivity_offset_density,
+            permittivity_offset_component: structure.permittivity_offset_component,
             born_sigma: structure.born_sigma,
             mu2,
             q2,

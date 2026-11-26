@@ -88,6 +88,11 @@ pub struct EPcpSaftOptions {
     pub bidh_dipole_factor: f64,
     /// Coefficients c_k of the offset Σ_k c_k τ^k, τ = (T/K - 298.15)/100, added to the relative permittivity
     pub permittivity_offset: [f64; 12],
+    /// Coefficients d_k of the reference density ρ_ref(T) = Σ_k d_k τ^k (1/Å³) of the component
+    /// `permittivity_offset_component`: the offset is multiplied by ρ_c / ρ_ref(T) (all zero: not scaled)
+    pub permittivity_offset_density: [f64; 12],
+    /// Component whose density ρ_c scales the permittivity offset
+    pub permittivity_offset_component: usize,
 }
 
 impl Default for EPcpSaftOptions {
@@ -106,6 +111,8 @@ impl Default for EPcpSaftOptions {
             ion_pairing_constant: PairingConstant::default(),
             bidh_dipole_factor: 0.25,
             permittivity_offset: [0.0; 12],
+            permittivity_offset_density: [0.0; 12],
+            permittivity_offset_component: 0,
         }
     }
 }
@@ -148,6 +155,20 @@ impl EPcpSaft {
             params.shell_factor = theta;
         }
         params.permittivity_offset = options.permittivity_offset;
+        if options
+            .permittivity_offset_density
+            .iter()
+            .any(|&d| d != 0.0)
+        {
+            let c = options.permittivity_offset_component;
+            if c >= params.m.len() || params.z[c] != 0.0 {
+                return Err(feos_core::FeosError::IncompatibleParameters(format!(
+                    "permittivity_offset_component {c}: must be a neutral component of the system"
+                )));
+            }
+        }
+        params.permittivity_offset_density = options.permittivity_offset_density;
+        params.permittivity_offset_component = options.permittivity_offset_component;
         params.born_sigma = options.born_diameter == BornDiameter::Sigma;
         let hard_chain = params.m.iter().any(|m| (m - 1.0).abs() > 1e-15);
 
@@ -1068,6 +1089,21 @@ mod tests_electrolyte {
             n_permittivity
         );
         Ok(())
+    }
+
+    /// The component that scales the permittivity offset must be a neutral component of the system.
+    #[test]
+    fn permittivity_offset_component() {
+        let options = |c| EPcpSaftOptions {
+            permittivity_offset: [0.5; 12],
+            permittivity_offset_density: [0.03; 12],
+            permittivity_offset_component: c,
+            ..Default::default()
+        };
+        let new = |c| EPcpSaft::with_options(water_nacl_parameters(), options(c));
+        assert!(new(0).is_ok());
+        assert!(new(1).is_err());
+        assert!(new(3).is_err());
     }
 
     /// The permittivity record does not change the Helmholtz energy of a system without ions.
