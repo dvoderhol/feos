@@ -9,7 +9,7 @@
 //!
 //! - K_ij: Bjerrum, Ebeling or contact-shell association constant ([PairingConstant]) with l = |z_i z_j| λ_B and the distance of closest
 //!   approach d_ij = (d_i + d_j) / 2;
-//! - f_ij: logarithm of an adjustable factor (`ion_pairing` of the binary parameters; 0: Bjerrum constant);
+//! - f_ij: logarithm of an adjustable factor (`ion_pairing` of the binary parameters; 0: the constant K_ij itself);
 //! - g_ij: contact value of the hard-sphere mixture of all species (segments) at d_ij, the same expression as in
 //!   the association term;
 //! - y_ij = exp(β μ_i + β μ_j - β μ_ij - β μ_DI,ij): electrostatic part of the cavity function of the reference
@@ -20,8 +20,8 @@
 //!   the solution; a pair has the permittivity contribution of its two ions, so that the composition dependence of
 //!   the permittivity does not enter y_ij.
 //!
-//! The terms of the publication are used in the corrected forms (association term with the sign of Wertheim's
-//! theory, Debye-Hückel chemical potential derived from a_DH).
+//! Differences from the printed equations of the publication: the association term has the sign of Wertheim's theory,
+//! and the Debye-Hückel chemical potential is derived from a_DH.
 use super::ion_pairing::{
     PairingConstant, PairingStrengths, non_paired_fractions, pairing_helmholtz_energy_density,
 };
@@ -33,7 +33,7 @@ use std::f64::consts::PI;
 /// Reduced Helmholtz energy density of the BiDH term for the ions with densities `rho` (Å⁻³), charges `z`,
 /// diameters `d` (Å), contact values `g` of the hard-sphere mixture at (d_i + d_j)/2, logarithms of the pairing
 /// factors `f`, Bjerrum length `lb` (Å), association constant `constant` with the binding distance factor
-/// `shell_factor` ([PairingConstant::constant]) and factor β_mn of the dipole term `dipole_factor` (0: without).
+/// `shell_factor` ([PairingConstant::Shell]) and factor β_mn of the dipole term `dipole_factor` (0: without).
 /// Returns (a / (kT V), fractions of non-paired ions X).
 #[expect(clippy::too_many_arguments)]
 pub fn bidh<D: DualNum<Primitive = f64> + Copy>(
@@ -141,8 +141,8 @@ fn dipole_integral<D: DualNum<Primitive = f64> + Copy>(k: D) -> D {
 /// β μ_DI = -3 β_mn δ² θ / (4π Σ_k ρ_k z_k²),   θ = I(κσ) / σ⁵,
 ///
 /// with the factor β_mn (`dipole_factor`, eq. 25), κ² = 4π λ_B Σ_k ρ_k z_k² and the dipole moment of the pair
-/// δ = (|z_i| + |z_j|) σ / 2 (in e Å; the publication defines δ = e Z σ for symmetric valences, the mean absolute
-/// charge is used for asymmetric ones, as in the authors' code).
+/// δ = (|z_i| + |z_j|) σ / 2 (in e Å; the publication defines δ = e Z σ for symmetric valences; the mean absolute
+/// charge Z = (|z_i| + |z_j|) / 2 is the dipole of the two charges at ±σ/2 from the centre of the pair).
 pub fn dipole_chemical_potential<D: DualNum<Primitive = f64> + Copy>(
     zi: f64,
     zj: f64,

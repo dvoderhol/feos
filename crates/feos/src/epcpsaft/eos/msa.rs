@@ -32,6 +32,8 @@ pub enum MsaPacking {
 const EXTRA_ITERATIONS: usize = 4;
 const MAX_ITER: usize = 100;
 const TOL: f64 = 1e-15;
+/// Residual of the closure (relative to Γ) up to which a Γ without converged step is accepted.
+const RESIDUAL_TOL: f64 = 1e-10;
 
 impl Msa {
     /// Reduced Helmholtz energy density with the screening parameter solved for the given
@@ -146,7 +148,9 @@ fn closure_residual<T: DualNum<Primitive = f64> + Copy>(
 
 /// Screening parameter Γ: Newton iteration in the number type D (exact derivatives with
 /// respect to everything that D carries), started from the solution for η = 0 and equal
-/// diameters, safeguarded by the bracket 0 < Γ <= κ/2.
+/// diameters, safeguarded by the bracket 0 < Γ <= κ/2; converged for a step below TOL Γ.
+/// NaN if the step does not get below TOL Γ within MAX_ITER iterations and the last residual
+/// of the closure exceeds RESIDUAL_TOL Γ.
 pub(super) fn screening_parameter<D: DualNum<Primitive = f64> + Copy>(
     rho: &[D],
     z: &[f64],
@@ -171,6 +175,7 @@ pub(super) fn screening_parameter<D: DualNum<Primitive = f64> + Copy>(
     let (lambda_l, delta_l) = (lift(bjerrum_length), lift(delta));
 
     let mut extra = 0;
+    let mut residual = f64::INFINITY;
     for _ in 0..MAX_ITER {
         let g = closure_residual(
             Dual::new(gamma, D::one()),
@@ -180,6 +185,7 @@ pub(super) fn screening_parameter<D: DualNum<Primitive = f64> + Copy>(
             lambda_l,
             delta_l,
         );
+        residual = g.re.re().abs();
         let mut next = gamma - g.re / g.eps;
         if !(next.re() > 0.0 && next.re() <= upper) {
             // safeguard: bisection towards the bracket (the residual decreases monotonically)
@@ -194,6 +200,9 @@ pub(super) fn screening_parameter<D: DualNum<Primitive = f64> + Copy>(
                 break;
             }
         }
+    }
+    if extra == 0 && (residual.is_nan() || residual > RESIDUAL_TOL * gamma.re()) {
+        return D::from(f64::NAN);
     }
     gamma
 }

@@ -1,5 +1,5 @@
 //! ePCP-SAFT with model parameters as dual numbers (derivatives with respect to model parameters).
-use super::EPcpSaft;
+use super::{EPcpSaft, EPcpSaftVariants};
 use crate::epcpsaft::parameters::EPcpSaftPars;
 use feos_core::ad::{ElectrolyteProperties, ReactionEquilibrium};
 use feos_core::{FeosError, FeosResult, Residual, StateHD};
@@ -84,6 +84,8 @@ impl EPcpSaftAD<f64> {
         let n = p0.m.len();
         let mut p = p0.map(DualSVec::from);
         let error = |msg: String| Err(FeosError::IncompatibleParameters(msg));
+        let variant = self.model.options.epcpsaft_variant;
+        let pairing = matches!(variant, EPcpSaftVariants::BiDH | EPcpSaftVariants::BiMSA);
         check_duplicates(parameters)?;
         for (k, &parameter) in parameters.iter().enumerate() {
             let seed = |x: &mut DualSVec<f64, P>| {
@@ -153,7 +155,19 @@ impl EPcpSaftAD<f64> {
                 }
                 BornDeltaCation => seed(&mut p.born_delta[0]),
                 BornDeltaAnion => seed(&mut p.born_delta[1]),
-                DhDelta => seed(&mut p.dh_delta),
+                DhDelta => {
+                    if variant != EPcpSaftVariants::DebyeHueckel {
+                        return error(format!(
+                            "{parameter:?}: the Debye-Hückel diameter is used only by the variant DebyeHueckel"
+                        ));
+                    }
+                    seed(&mut p.dh_delta)
+                }
+                IonPairingShell | IonPairing(..) if !pairing => {
+                    return error(format!(
+                        "{parameter:?}: ion pairing is used only by the variants BiDH and BiMSA"
+                    ));
+                }
                 IonPairingShell => {
                     if !matches!(
                         self.model.options.ion_pairing_constant,
@@ -618,7 +632,7 @@ mod tests {
         )?);
         let moles = dvector![1.0 / 0.018015268, 1.5, 1.5] * MOL;
         let (t, p) = (320.0 * KELVIN, 2e5 * PASCAL);
-        let parameters = [
+        let mut parameters = vec![
             Sigma(1),
             EpsilonK(2),
             KIJ(0, 1),
@@ -627,10 +641,18 @@ mod tests {
             CorrelationIntegralParameter(2),
             BornDeltaCation,
             BornDeltaAnion,
-            DhDelta,
             Sigma(2),
             EpsilonK(1),
         ];
+        // parameters that do not enter the variant are rejected
+        let ad = EPcpSaftAD::new(eos.clone());
+        if epcpsaft_variant == super::super::EPcpSaftVariants::DebyeHueckel {
+            parameters.push(DhDelta);
+        } else {
+            assert!(ad.derivatives([DhDelta]).is_err());
+        }
+        assert!(ad.derivatives([IonPairing(1, 2)]).is_err());
+        assert!(ad.derivatives([IonPairingShell]).is_err());
         let flatten = |e: &ElectrolyteDerivatives| {
             let mut v = vec![
                 e.ln_solvent_activity.clone(),

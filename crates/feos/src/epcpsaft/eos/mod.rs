@@ -50,9 +50,9 @@ pub enum EPcpSaftVariants {
     DebyeHueckel,
     /// Mean spherical approximation of the primitive model (Blum 1975).
     MeanSphericalApproximation,
-    /// Debye-Hückel term with ion pairing (BiDH; Naseri Boroujeni et al. 2023), see [bidh].
+    /// Debye-Hückel term with ion pairing (BiDH; Naseri Boroujeni et al. 2023), see the module `bidh`.
     BiDH,
-    /// Binding mean spherical approximation (BiMSA; Bernard and Blum 1996), see [bimsa].
+    /// Binding mean spherical approximation (BiMSA; Bernard and Blum 1996), see the module `bimsa`.
     BiMSA,
 }
 
@@ -220,7 +220,7 @@ impl EPcpSaft {
             Dispersion.helmholtz_energy_density(p, state, zeta[3]),
         );
         // the polar terms are set up from `p`, which can carry derivatives with respect to the
-        // model parameters (pcsaft precomputes them in the constructor)
+        // model parameters
         if self.dipole {
             f(
                 "Dipole",
@@ -358,8 +358,8 @@ impl<D: DualNum<Primitive = f64> + Copy> EPcpSaftPars<D> {
         d
     }
 
-    /// Born diameter: hard-sphere diameter (or sigma if `born_sigma`) plus born_delta[0]
-    /// (cations) or born_delta[1] (anions).
+    /// Born diameter: hard-sphere diameter (or sigma if `born_sigma`) plus `born_delta[0]`
+    /// (cations) or `born_delta[1]` (anions).
     pub fn born_diameter(&self, temperature: D) -> DVector<D> {
         let mut d = self.diameter(temperature);
         for &i in &self.ionic_comp {

@@ -26,4 +26,4 @@ scheme selection of Rueben et al. (2024a); water: scheme P prescribed (`dipole_s
 
 ## Ions
 
-No ion parameters yet. All ion parameters (`m = 1`, `sigma`, `epsilon_k`, `z`, `permittivity_record` and ion-solvent `k_ij`) are fitted for ePCP-SAFT.
+This folder contains no ion parameters. All ion parameters (`m = 1`, `sigma`, `epsilon_k`, `z`, `permittivity_record` and ion-solvent `k_ij`) are fitted for ePCP-SAFT.

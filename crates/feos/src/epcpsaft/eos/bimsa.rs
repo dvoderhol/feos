@@ -52,7 +52,7 @@ pub struct BiMsaInput<'a, D> {
     pub f: &'a DMatrix<D>,
     /// association constant
     pub constant: PairingConstant,
-    /// binding distance factor θ of the contact-shell constant ([PairingConstant::constant])
+    /// binding distance factor θ of the contact-shell constant ([PairingConstant::Shell])
     pub shell_factor: D,
 }
 

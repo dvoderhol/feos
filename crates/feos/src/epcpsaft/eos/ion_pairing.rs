@@ -170,11 +170,11 @@ pub fn ln_ebeling_constant<D: DualNum<Primitive = f64> + Copy>(l: D, sigma: D) -
 /// Association constant of an ion pair used by the ion-pairing variants.
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub enum PairingConstant {
-    /// Bjerrum constant ([bjerrum_constant]; zero for l / σ <= 2).
+    /// Bjerrum constant (`bjerrum_constant`; zero for l / σ <= 2).
     Bjerrum,
-    /// Ebeling constant ([ebeling_constant]; analytic in l / σ).
+    /// Ebeling constant (`ebeling_constant`; analytic in l / σ).
     Ebeling,
-    /// Contact-pair constant over the shell σ..θσ ([shell_constant]); the value is the initial binding distance
+    /// Contact-pair constant over the shell σ..θσ (`shell_constant`); the value is the initial binding distance
     /// factor θ of the parameters (`shell_factor` of the model parameters, adjustable).
     Shell(f64),
 }
@@ -228,6 +228,10 @@ impl<D: DualNum<Primitive = f64> + Copy> PairingStrengths<D> {
 const LN_DELTA_LOG_FORM: f64 = 200.0;
 /// ln Δ up to which e^(-ln Δ) is evaluated in the logarithmic closed form for equal densities.
 const LN_DELTA_UNDERFLOW: f64 = 700.0;
+/// Largest change of ln(ρ_i X_i) per Newton step of [log_fractions].
+const MAX_LOG_STEP: f64 = 2.0;
+/// Largest number of step halvings per Newton step of [log_fractions].
+const MAX_BACKTRACK: usize = 40;
 
 /// ln(1 + e^z)
 fn softplus<D: DualNum<Primitive = f64> + Copy>(z: D) -> D {
@@ -243,10 +247,9 @@ fn softplus<D: DualNum<Primitive = f64> + Copy>(z: D) -> D {
 ///
 /// - one cation-anion pair: closed form of the association of one A and one B site ([closed_form]), evaluated in the
 ///   number type D;
-/// - several pairs: Newton iteration of Michelsen (Ind. Eng. Chem. Res. 45 (2006) 8449) for
-///   g_i = 1/X_i - 1 - Σ_j ρ_j X_j Δ_ij = 0 in f64 from X_i = 0.2, where a Newton step that would lower X_i by
-///   0.8 X_i or more is replaced by X_i → 0.2 X_i; converged for ||g||₂ < TOL; then Newton steps in the number type D
-///   for the derivatives with respect to everything that D carries. NaN if the iteration does not converge.
+/// - several pairs: Newton iteration of Michelsen ([michelsen]) if all ln Δ_ij < LN_DELTA_LOG_FORM; if it does not
+///   converge, or for larger ln Δ_ij, Newton iteration for the logarithms ln X_i ([log_fractions]). NaN if neither
+///   converges.
 pub fn non_paired_fractions<D: DualNum<Primitive = f64> + Copy>(
     rho: &DVector<D>,
     strengths: &PairingStrengths<D>,
@@ -263,6 +266,28 @@ pub fn non_paired_fractions<D: DualNum<Primitive = f64> + Copy>(
         }
         _ => (),
     }
+    if strengths
+        .pairs
+        .iter()
+        .all(|&(i, j)| strengths.ln_delta[(i, j)].re() < LN_DELTA_LOG_FORM)
+        && let Some(x) = michelsen(rho, strengths)
+    {
+        let ln_x = x.map(|v| v.ln());
+        return (x, ln_x);
+    }
+    let ln_x = log_fractions(rho, strengths);
+    (ln_x.map(|v| v.exp()), ln_x)
+}
+
+/// X_i of several pairs: Newton iteration of Michelsen (Ind. Eng. Chem. Res. 45 (2006) 8449) for
+/// g_i = 1/X_i - 1 - Σ_j ρ_j X_j Δ_ij = 0 in f64 from X_i = 0.2, where a Newton step that would lower X_i by 0.8 X_i or
+/// more is replaced by X_i → 0.2 X_i; converged for ||g||₂ < TOL; then Newton steps in the number type D for the
+/// derivatives with respect to everything that D carries ([newton]). None if the iteration does not converge.
+fn michelsen<D: DualNum<Primitive = f64> + Copy>(
+    rho: &DVector<D>,
+    strengths: &PairingStrengths<D>,
+) -> Option<DVector<D>> {
+    let n = rho.len();
     let mut delta = DMatrix::zeros(n, n);
     for &(i, j) in &strengths.pairs {
         delta[(i, j)] = strengths.ln_delta[(i, j)].exp();
@@ -271,22 +296,20 @@ pub fn non_paired_fractions<D: DualNum<Primitive = f64> + Copy>(
     let rho_re = rho.map(|r| r.re());
     let delta_re = delta.map(|d: D| d.re());
     let mut x = DVector::from_element(n, 0.2);
-    let mut converged = false;
     for _ in 0..MAX_ITER {
         let s = DVector::from_fn(n, |i, _| {
             (0..n).fold(0.0, |acc, j| acc + rho_re[j] * x[j] * delta_re[(i, j)])
         });
         let mut g = DVector::from_fn(n, |i, _| 1.0 / x[i] - 1.0 - s[i]);
         if g.norm() < TOL {
-            converged = true;
-            break;
+            return Some(newton(&x.map(D::from), rho, &delta));
         }
         let h = DMatrix::from_fn(n, n, |i, j| {
             let diag = if i == j { -(1.0 + s[i]) / x[i] } else { 0.0 };
             diag - delta_re[(i, j)] * rho_re[j]
         });
         if !h.lu().solve_mut(&mut g) {
-            break;
+            return None;
         }
         for i in 0..n {
             if g[i] < 0.8 * x[i] {
@@ -296,13 +319,7 @@ pub fn non_paired_fractions<D: DualNum<Primitive = f64> + Copy>(
             }
         }
     }
-    if !converged {
-        let nan = DVector::from_element(n, D::from(f64::NAN));
-        return (nan.clone(), nan);
-    }
-    let x = newton(&x.map(D::from), rho, &delta);
-    let ln_x = x.map(|v| v.ln());
-    (x, ln_x)
+    None
 }
 
 /// (ln X_a, ln X_b) of one cation and one anion with the association strength Δ = e^(ln Δ): the solution of
@@ -389,6 +406,411 @@ fn newton<D: DualNum<Primitive = f64> + Copy>(
         x -= step;
     }
     x
+}
+
+/// ln X_i of several pairs from the mass-action law in logarithms. With λ_i = ln ρ_i + ln X_i (logarithm of the
+/// density of non-paired ions i, ρ_i > 0), the free densities y_i = e^λ_i and the pair densities
+/// p_ij = e^(λ_i + λ_j + ln Δ_ij), the mass balances are
+///
+/// F_i = ln(b_i / ρ_i) = ln X_i + ln(1 + Σ_j e^(ln ρ_j + ln X_j + ln Δ_ij)) = 0,   b_i = y_i + Σ_j p_ij,
+///
+/// with the sum evaluated as softplus of a log-sum-exp. b - ρ is the gradient of the convex function
+/// Σ_i (y_i - ρ_i λ_i) + Σ_pairs p_ij; its Hessian H = diag(y) + Bᵀ diag(p) B (B: incidence matrix of pairs and ions)
+/// gives the Newton step H Δλ = -(b - ρ), solved with [HessianSolver]. Pairs connect cations and anions only: in every connected group of ions with signs s_i = ±1 (cations and anions), the direction s leaves all
+/// p_ij unchanged and E = Σ_i s_i (y_i - ρ_i) = Σ_i s_i (b_i - ρ_i) holds exactly. The component of b - ρ along s is
+/// taken as E, which is evaluated without the pair densities: this resolves free densities far below the rounding
+/// error of ρ_i when almost all ions are paired.
+///
+/// Iteration in f64 from ln X_i = -ln(1 + max_j ρ_j Δ_ij) / 2: E = 0 is solved exactly along the signs of every group
+/// ([balance_groups]); the Newton step projected onto the orthogonal complement of the sign vectors (a descent direction
+/// of the convex function where E = 0) is scaled to max_i |Δλ_i| <= MAX_LOG_STEP and halved (at most MAX_BACKTRACK
+/// times) until, after [balance_groups], the convex function decreases by at least 1e-4 of its linear prediction or
+/// max_i |F_i| decreases; converged for max_i |F_i| < TOL and |E| <= TOL (Σ_i y_i + |Σ_i s_i ρ_i|) in every group;
+/// then EXTRA_ITERATIONS Newton steps in the number type D. Ions with ρ_i = 0: ln X_i = -ln(1 + Σ_j ρ_j X_j Δ_ij) from
+/// the solution of the others; the derivatives with respect to their densities are not included. NaN if the iteration
+/// does not converge.
+fn log_fractions<D: DualNum<Primitive = f64> + Copy>(
+    rho: &DVector<D>,
+    strengths: &PairingStrengths<D>,
+) -> DVector<D> {
+    let n = rho.len();
+    let present: Vec<bool> = rho.iter().map(|r| r.re() > 0.0).collect();
+    let pairs: Vec<(usize, usize, D)> = strengths
+        .pairs
+        .iter()
+        .filter(|&&(i, j)| present[i] && present[j])
+        .map(|&(i, j)| (i, j, strengths.ln_delta[(i, j)]))
+        .collect();
+    let groups = signed_groups(n, &pairs);
+    let ln_rho = DVector::from_fn(n, |i, _| if present[i] { rho[i].ln() } else { D::zero() });
+    let nan = || DVector::from_element(n, D::from(f64::NAN));
+
+    let pairs_re: Vec<(usize, usize, f64)> =
+        pairs.iter().map(|&(i, j, l)| (i, j, l.re())).collect();
+    let ln_rho_re = ln_rho.map(|v| v.re());
+    let rho_re = rho.map(|r| r.re());
+    let relative_invariant = |ln_x: &DVector<f64>| {
+        groups.iter().fold(0.0, |acc: f64, group| {
+            let e = invariant(&rho_re, &ln_rho_re, group, ln_x);
+            let free: f64 = group
+                .iter()
+                .map(|&(i, _)| (ln_rho_re[i] + ln_x[i]).exp())
+                .sum();
+            acc.max(e.abs() / (free + group_excess(&rho_re, group).abs()))
+        })
+    };
+    let mut ln_x = DVector::zeros(n);
+    for &(i, j, ln_delta) in &pairs_re {
+        ln_x[i] = f64::min(ln_x[i], -0.5 * softplus(ln_rho_re[j] + ln_delta));
+        ln_x[j] = f64::min(ln_x[j], -0.5 * softplus(ln_rho_re[i] + ln_delta));
+    }
+    balance_groups(&rho_re, &ln_rho_re, &groups, &mut ln_x);
+    let mut f = log_balance(&ln_rho_re, &pairs_re, &ln_x);
+    let mut phi = dual_function(&ln_rho_re, &pairs_re, &present, &ln_x);
+    let mut converged = false;
+    for _ in 0..MAX_ITER {
+        if f.amax() < TOL && relative_invariant(&ln_x) <= TOL {
+            converged = true;
+            break;
+        }
+        let Some(hessian) = HessianSolver::new(&ln_rho_re, &pairs_re, &present, &groups, &ln_x)
+        else {
+            break;
+        };
+        let (gradient, r_v) = gradient(&rho_re, &ln_rho_re, &present, &groups, &f, &ln_x);
+        let (_, beta) = hessian.solve(&r_v, &gradient);
+        let mut step = -(&hessian.u * beta);
+        let max = step.amax();
+        if !max.is_finite() {
+            break;
+        }
+        if max > MAX_LOG_STEP {
+            step *= MAX_LOG_STEP / max;
+        }
+        let mut slope = gradient.dot(&step);
+        let mut accepted = false;
+        for _ in 0..MAX_BACKTRACK {
+            let mut trial = &ln_x + &step;
+            balance_groups(&rho_re, &ln_rho_re, &groups, &mut trial);
+            let f_trial = log_balance(&ln_rho_re, &pairs_re, &trial);
+            let phi_trial = dual_function(&ln_rho_re, &pairs_re, &present, &trial);
+            if phi_trial <= phi + 1e-4 * slope || f_trial.amax() < f.amax() {
+                (ln_x, f, phi) = (trial, f_trial, phi_trial);
+                accepted = true;
+                break;
+            }
+            step *= 0.5;
+            slope *= 0.5;
+        }
+        if !accepted {
+            break;
+        }
+    }
+    if !converged {
+        return nan();
+    }
+    let mut ln_x_d = ln_x.map(D::from);
+    for _ in 0..EXTRA_ITERATIONS {
+        let ln_x_re = ln_x_d.map(|v| v.re());
+        let Some(hessian) = HessianSolver::new(&ln_rho_re, &pairs_re, &present, &groups, &ln_x_re)
+        else {
+            return nan();
+        };
+        let f = log_balance(&ln_rho, &pairs, &ln_x_d);
+        let (gradient, r_v) = gradient(rho, &ln_rho, &present, &groups, &f, &ln_x_d);
+        let (alpha, beta) = hessian.solve(&r_v, &gradient);
+        ln_x_d -= mat_vec(&hessian.v, &alpha) + mat_vec(&hessian.u, &beta);
+    }
+    let mut absent_terms: Vec<Vec<D>> = vec![Vec::new(); n];
+    for &(i, j) in &strengths.pairs {
+        for (a, c) in [(i, j), (j, i)] {
+            if !present[a] && present[c] {
+                absent_terms[a].push(ln_rho[c] + ln_x_d[c] + strengths.ln_delta[(i, j)]);
+            }
+        }
+    }
+    for (a, terms) in absent_terms.iter().enumerate() {
+        if let Some(max) = terms.iter().map(|t| t.re()).reduce(f64::max) {
+            let lse = terms
+                .iter()
+                .fold(D::zero(), |acc, &t| acc + (t - max).exp())
+                .ln()
+                + max;
+            ln_x_d[a] = -softplus(lse);
+        }
+    }
+    ln_x_d
+}
+
+/// Connected groups of the ions of `pairs` with the signs s_i = ±1 of a two-coloring (cations and anions); empty if
+/// the pairs are not bipartite.
+fn signed_groups<D>(n: usize, pairs: &[(usize, usize, D)]) -> Vec<Vec<(usize, f64)>> {
+    let mut neighbors = vec![Vec::new(); n];
+    for &(i, j, _) in pairs {
+        neighbors[i].push(j);
+        neighbors[j].push(i);
+    }
+    let mut sign = vec![0.0; n];
+    let mut groups = Vec::new();
+    for start in 0..n {
+        if sign[start] != 0.0 || neighbors[start].is_empty() {
+            continue;
+        }
+        sign[start] = 1.0;
+        let mut group = vec![(start, 1.0)];
+        let mut k = 0;
+        while k < group.len() {
+            let (i, s) = group[k];
+            for &j in &neighbors[i] {
+                if sign[j] == 0.0 {
+                    sign[j] = -s;
+                    group.push((j, -s));
+                } else if sign[j] == s {
+                    return Vec::new();
+                }
+            }
+            k += 1;
+        }
+        groups.push(group);
+    }
+    groups
+}
+
+/// Σ_i s_i ρ_i of a group as (Σ_(s_i = 1) ρ_i) - (Σ_(s_i = -1) ρ_i), with one rounding in the difference.
+fn group_excess<D: DualNum<Primitive = f64> + Copy>(rho: &DVector<D>, group: &[(usize, f64)]) -> D {
+    let sum = |sign: f64| {
+        group
+            .iter()
+            .filter(|&&(_, s)| s == sign)
+            .fold(D::zero(), |acc, &(i, _)| acc + rho[i])
+    };
+    sum(1.0) - sum(-1.0)
+}
+
+/// E = Σ_i s_i y_i - Σ_i s_i ρ_i of a signed group of [log_fractions] at ln X (the sums separately, so that the
+/// rounding error of ρ_i enters only through the constant [group_excess]).
+fn invariant<D: DualNum<Primitive = f64> + Copy>(
+    rho: &DVector<D>,
+    ln_rho: &DVector<D>,
+    group: &[(usize, f64)],
+    ln_x: &DVector<D>,
+) -> D {
+    let free = group.iter().fold(D::zero(), |acc, &(i, s)| {
+        acc + (ln_rho[i] + ln_x[i]).exp() * s
+    });
+    free - group_excess(rho, group)
+}
+
+/// Exact solution of E = 0 along the signs of every group of [log_fractions]: ln X_i → ln X_i + s_i a leaves all pair
+/// densities unchanged and gives E(a) = A e^a - B e^(-a) - c with A = Σ_(s_i = 1) y_i, B = Σ_(s_i = -1) y_i and the
+/// excess c = Σ_i s_i ρ_i, so that w = e^a is the positive root of A w² - c w - B = 0 (evaluated in logarithms).
+fn balance_groups(
+    rho: &DVector<f64>,
+    ln_rho: &DVector<f64>,
+    groups: &[Vec<(usize, f64)>],
+    ln_x: &mut DVector<f64>,
+) {
+    let ln_sum = |terms: Vec<f64>| {
+        let max = terms.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        max + terms.iter().map(|t| (t - max).exp()).sum::<f64>().ln()
+    };
+    for group in groups {
+        let lambda = |sign: f64| {
+            group
+                .iter()
+                .filter(|&&(_, s)| s == sign)
+                .map(|&(i, _)| ln_rho[i] + ln_x[i])
+                .collect::<Vec<_>>()
+        };
+        let (ln_a, ln_b) = (ln_sum(lambda(1.0)), ln_sum(lambda(-1.0)));
+        let excess = group_excess(rho, group);
+        let a = if excess == 0.0 {
+            0.5 * (ln_b - ln_a)
+        } else {
+            // r = 4 A B / c², [c² + 4 A B]^1/2 = |c| (1 + r)^1/2
+            let ln_r = 4.0f64.ln() + ln_a + ln_b - 2.0 * excess.abs().ln();
+            let ln_1p_sqrt = (0.5 * softplus(ln_r)).exp().ln_1p();
+            if excess > 0.0 {
+                excess.ln() + ln_1p_sqrt - LN_2 - ln_a
+            } else {
+                LN_2 + ln_b - (-excess).ln() - ln_1p_sqrt
+            }
+        };
+        for &(i, s) in group {
+            ln_x[i] += s * a;
+        }
+    }
+}
+
+/// Gradient b - ρ = ρ (e^F - 1) of the convex function of [log_fractions] (zero for ions with ρ = 0) and its
+/// components along the normalized sign vectors of the groups, E / n_group^1/2 with the exact invariants E.
+fn gradient<D: DualNum<Primitive = f64> + Copy>(
+    rho: &DVector<D>,
+    ln_rho: &DVector<D>,
+    present: &[bool],
+    groups: &[Vec<(usize, f64)>],
+    f: &DVector<D>,
+    ln_x: &DVector<D>,
+) -> (DVector<D>, DVector<D>) {
+    let g = DVector::from_fn(rho.len(), |i, _| {
+        if present[i] {
+            rho[i] * f[i].exp_m1()
+        } else {
+            D::zero()
+        }
+    });
+    let r_v = DVector::from_fn(groups.len(), |k, _| {
+        invariant(rho, ln_rho, &groups[k], ln_x) / (groups[k].len() as f64).sqrt()
+    });
+    (g, r_v)
+}
+
+/// F_i = ln X_i + ln(1 + Σ_j e^(ln ρ_j + ln X_j + ln Δ_ij)) of [log_fractions] for the pairs (i, j, ln Δ_ij) of ions
+/// with ρ > 0; F_i = 0 for ions without pairs.
+fn log_balance<D: DualNum<Primitive = f64> + Copy>(
+    ln_rho: &DVector<D>,
+    pairs: &[(usize, usize, D)],
+    ln_x: &DVector<D>,
+) -> DVector<D> {
+    let n = ln_rho.len();
+    let mut terms: Vec<Vec<D>> = vec![Vec::new(); n];
+    for &(i, j, ln_delta) in pairs {
+        terms[i].push(ln_rho[j] + ln_x[j] + ln_delta);
+        terms[j].push(ln_rho[i] + ln_x[i] + ln_delta);
+    }
+    DVector::from_fn(n, |i, _| {
+        let Some(max) = terms[i].iter().map(|t| t.re()).reduce(f64::max) else {
+            return D::zero();
+        };
+        let lse = terms[i]
+            .iter()
+            .fold(D::zero(), |acc, &t| acc + (t - max).exp())
+            .ln()
+            + max;
+        ln_x[i] + softplus(lse)
+    })
+}
+
+/// Dual function Σ_i (y_i - ρ_i λ_i) + Σ_pairs p_ij of [log_fractions] at ln X (λ_i = ln ρ_i + ln X_i, ions with ρ > 0).
+fn dual_function(
+    ln_rho: &DVector<f64>,
+    pairs: &[(usize, usize, f64)],
+    present: &[bool],
+    ln_x: &DVector<f64>,
+) -> f64 {
+    let lambda = ln_rho + ln_x;
+    let free: f64 = (0..ln_rho.len())
+        .filter(|&i| present[i])
+        .map(|i| lambda[i].exp() - ln_rho[i].exp() * lambda[i])
+        .sum();
+    let paired: f64 = pairs
+        .iter()
+        .map(|&(i, j, ln_delta)| (lambda[i] + lambda[j] + ln_delta).exp())
+        .sum();
+    free + paired
+}
+
+/// Solution of H d = g for the Hessian H = diag(y) + Bᵀ diag(p) B of [log_fractions] at ln X (ions with ρ = 0:
+/// H_ii = 1 without pairs). B v = 0 for the sign vectors v of the groups, so H v = diag(y) v. With the normalized sign
+/// vectors as columns of V and an orthonormal complement U, d = V α + U β from the blocks
+/// [Vᵀ diag(y) V, Cᵀ; C, M] [α; β] = [Vᵀ g; Uᵀ g] with C = Uᵀ diag(y) V and M = Uᵀ H U (Schur complement in α),
+/// where the blocks with V are evaluated from y directly instead of from H, and Vᵀ g is given separately (exact
+/// invariants E instead of the rounded components of g).
+struct HessianSolver {
+    v: DMatrix<f64>,
+    u: DMatrix<f64>,
+    c: DMatrix<f64>,
+    m_inv: DMatrix<f64>,
+    schur_inv: DMatrix<f64>,
+}
+
+impl HessianSolver {
+    fn new(
+        ln_rho: &DVector<f64>,
+        pairs: &[(usize, usize, f64)],
+        present: &[bool],
+        groups: &[Vec<(usize, f64)>],
+        ln_x: &DVector<f64>,
+    ) -> Option<Self> {
+        let n = ln_rho.len();
+        let y = DVector::from_fn(n, |i, _| {
+            if present[i] {
+                (ln_rho[i] + ln_x[i]).exp()
+            } else {
+                1.0
+            }
+        });
+        let mut h = DMatrix::from_diagonal(&y);
+        for &(i, j, ln_delta) in pairs {
+            let p = (ln_rho[i] + ln_x[i] + ln_rho[j] + ln_x[j] + ln_delta).exp();
+            h[(i, i)] += p;
+            h[(j, j)] += p;
+            h[(i, j)] += p;
+            h[(j, i)] += p;
+        }
+        let mut v = DMatrix::zeros(n, groups.len());
+        for (k, group) in groups.iter().enumerate() {
+            let norm = (group.len() as f64).sqrt();
+            for &(i, s) in group {
+                v[(i, k)] = s / norm;
+            }
+        }
+        // orthonormal complement of V: Gram-Schmidt (twice) of the unit vectors
+        let mut basis: Vec<DVector<f64>> = v.column_iter().map(|c| c.into_owned()).collect();
+        let mut u_columns = Vec::new();
+        for i in 0..n {
+            let mut e = DVector::zeros(n);
+            e[i] = 1.0;
+            for _ in 0..2 {
+                for b in &basis {
+                    let projection = b.dot(&e);
+                    e.axpy(-projection, b, 1.0);
+                }
+            }
+            let norm = e.norm();
+            if norm > 1e-8 {
+                e /= norm;
+                basis.push(e.clone());
+                u_columns.push(e);
+            }
+        }
+        if u_columns.len() + groups.len() != n {
+            return None;
+        }
+        let u = DMatrix::from_columns(&u_columns);
+        let yv = DMatrix::from_fn(n, groups.len(), |i, k| y[i] * v[(i, k)]);
+        let c = u.transpose() * &yv;
+        let m_inv = (u.transpose() * &h * &u).try_inverse()?;
+        let schur = v.transpose() * &yv - c.transpose() * &m_inv * &c;
+        let schur_inv = schur.try_inverse()?;
+        let finite = |m: &DMatrix<f64>| m.iter().all(|x| x.is_finite());
+        (finite(&m_inv) && finite(&schur_inv)).then_some(Self {
+            v,
+            u,
+            c,
+            m_inv,
+            schur_inv,
+        })
+    }
+
+    /// (α, β) of H (V α + U β) = g for the components r_v = Vᵀ g (given separately) and Uᵀ g of the right-hand side.
+    fn solve<D: DualNum<Primitive = f64> + Copy>(
+        &self,
+        r_v: &DVector<D>,
+        g: &DVector<D>,
+    ) -> (DVector<D>, DVector<D>) {
+        let t = mat_vec(&self.m_inv, &mat_vec(&self.u.transpose(), g));
+        let alpha = mat_vec(&self.schur_inv, &(r_v - mat_vec(&self.c.transpose(), &t)));
+        let beta = t - mat_vec(&self.m_inv, &mat_vec(&self.c, &alpha));
+        (alpha, beta)
+    }
+}
+
+/// Product of a real matrix and a vector of the number type D.
+fn mat_vec<D: DualNum<Primitive = f64> + Copy>(a: &DMatrix<f64>, x: &DVector<D>) -> DVector<D> {
+    DVector::from_fn(a.nrows(), |i, _| {
+        (0..a.ncols()).fold(D::zero(), |acc, j| acc + x[j] * a[(i, j)])
+    })
 }
 
 /// Density of pairs ρ_i ρ_j X_i X_j Δ_ij from ln(X_i X_j Δ_ij) = `ln_xxd`: as a product of the densities if one of
@@ -848,5 +1270,157 @@ mod tests {
         let h = 1e-8;
         let g = |rp: f64| npf(&dvector![rp, rm], &dmatrix![0.0, d; d, 0.0])[0];
         assert_relative_eq!(dx, (g(rp + h) - g(rp - h)) / (2.0 * h), max_relative = 1e-6);
+    }
+
+    /// strengths of one cation (index 2) paired with two anions: ln Δ_02 = ln_k, ln Δ_12 = ln_k + ln 3
+    fn mixture_strengths<D: DualNum<Primitive = f64> + Copy>(ln_k: D) -> PairingStrengths<D> {
+        let mut ln_delta = DMatrix::zeros(3, 3);
+        ln_delta[(0, 2)] = ln_k;
+        ln_delta[(1, 2)] = ln_k + 3.0f64.ln();
+        PairingStrengths {
+            ln_delta,
+            pairs: vec![(0, 2), (1, 2)],
+        }
+    }
+
+    /// max_i |ln X_i + ln(1 + Σ_j ρ_j X_j Δ_ij)| from ln X and ln Δ, with the sum as log-sum-exp
+    fn log_mass_action_residual(
+        rho: &DVector<f64>,
+        strengths: &PairingStrengths<f64>,
+        ln_x: &DVector<f64>,
+    ) -> f64 {
+        let n = rho.len();
+        (0..n)
+            .map(|i| {
+                let terms: Vec<f64> = strengths
+                    .pairs
+                    .iter()
+                    .filter_map(|&(a, b)| match (a == i, b == i) {
+                        (true, _) => Some((b, strengths.ln_delta[(a, b)])),
+                        (_, true) => Some((a, strengths.ln_delta[(a, b)])),
+                        _ => None,
+                    })
+                    .map(|(j, ln_delta)| rho[j].ln() + ln_x[j] + ln_delta)
+                    .collect();
+                let max = terms.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+                let lse = max + terms.iter().map(|t| (t - max).exp()).sum::<f64>().ln();
+                (ln_x[i] + softplus(lse)).abs()
+            })
+            .fold(0.0, f64::max)
+    }
+
+    #[test]
+    fn log_fractions_equal_michelsen() {
+        let mut compared = 0;
+        for ln_k in [-4.0f64, 2.3, 9.2, 16.1, 20.0] {
+            for (r1, r2, r3) in [
+                (0.004, 0.001, 0.005),
+                (0.001, 0.001, 0.0021),
+                (0.01, 1e-6, 0.002),
+            ] {
+                let rho = dvector![r1, r2, r3];
+                let strengths = mixture_strengths(ln_k);
+                let ln_x = log_fractions(&rho, &strengths);
+                if let Some(x) = michelsen(&rho, &strengths) {
+                    for i in 0..3 {
+                        assert_relative_eq!(ln_x[i].exp(), x[i], max_relative = 1e-9);
+                    }
+                    compared += 1;
+                }
+            }
+        }
+        assert!(compared >= 12, "{compared}");
+    }
+
+    #[test]
+    fn mixture_large_strengths() {
+        for ln_k in [25.0f64, 60.0, 199.0, 201.0, 400.0, 750.0] {
+            for (r1, r2, r3) in [
+                (0.004, 0.001, 0.005),
+                (0.001, 0.001, 0.0021),
+                (0.01, 1e-6, 0.002),
+                (1e-9, 2e-9, 3e-9),
+            ] {
+                let rho = dvector![r1, r2, r3];
+                let strengths = mixture_strengths(ln_k);
+                let (x, ln_x) = non_paired_fractions(&rho, &strengths);
+                assert!(x.iter().all(|&x| (0.0..=1.0).contains(&x)), "{ln_k}: {x}");
+                assert!(ln_x.iter().all(|v: &f64| v.is_finite()), "{ln_k}: {ln_x}");
+                assert!(
+                    log_mass_action_residual(&rho, &strengths, &ln_x) < 1e-9,
+                    "{ln_k}: {ln_x}"
+                );
+                // every pair removes one cation and one anion: free cations - free anions = cations - anions
+                let free_cations = (rho[2].ln() + ln_x[2]).exp();
+                let free_anions = (rho[0].ln() + ln_x[0]).exp() + (rho[1].ln() + ln_x[1]).exp();
+                let excess = r3 - (r1 + r2);
+                assert_relative_eq!(
+                    free_cations - free_anions,
+                    excess,
+                    max_relative = 1e-9,
+                    epsilon = 1e-9 * (free_cations + free_anions)
+                );
+            }
+        }
+        // electroneutral (excess exactly zero): ln X_+ + ln X_- = -ln(ρ Δ) for complete pairing
+        let rho = dvector![0.004, 0.001, 0.005];
+        let ln_x = non_paired_fractions(&rho, &mixture_strengths(400.0)).1;
+        assert_relative_eq!(
+            ln_x[0] + ln_x[2],
+            -(400.0 + 0.005f64.ln()),
+            max_relative = 1e-6
+        );
+        // continuous where the iteration changes from X to ln X
+        let rho = dvector![0.004, 0.0011, 0.005];
+        let below = non_paired_fractions(&rho, &mixture_strengths(LN_DELTA_LOG_FORM - 1e-9)).1;
+        let above = non_paired_fractions(&rho, &mixture_strengths(LN_DELTA_LOG_FORM + 1e-9)).1;
+        for i in 0..3 {
+            assert_relative_eq!(below[i], above[i], max_relative = 1e-8);
+        }
+    }
+
+    #[test]
+    fn log_fractions_absent_ion() {
+        // ion 1 at zero density: the others as one pair (closed form), ln X_1 = -ln(1 + ρ_2 X_2 Δ_12)
+        let (r0, r2, ln_k) = (0.003, 0.004, 300.0);
+        let rho = dvector![r0, 0.0, r2];
+        let strengths = mixture_strengths(ln_k);
+        let ln_x = log_fractions(&rho, &strengths);
+        let (ln_x0, ln_x2) = closed_form(r0, r2, ln_k);
+        assert_relative_eq!(ln_x[0], ln_x0, max_relative = 1e-10);
+        assert_relative_eq!(ln_x[2], ln_x2, max_relative = 1e-10);
+        let ln_x1 = -softplus(r2.ln() + ln_x2 + ln_k + 3.0f64.ln());
+        assert_relative_eq!(ln_x[1], ln_x1, max_relative = 1e-10);
+    }
+
+    #[test]
+    fn log_fractions_derivative() {
+        // d ln X / dρ_0 and d ln X / d ln Δ of the logarithmic iteration against central differences
+        let (r1, r2, r3) = (0.002, 0.001, 0.004);
+        for ln_k in [250.0f64, 800.0] {
+            let f = |r: Dual64| {
+                let rho = dvector![r, Dual64::from(r2), Dual64::from(r3)];
+                non_paired_fractions(&rho, &mixture_strengths(Dual64::from(ln_k))).1
+            };
+            let g = |r: f64| non_paired_fractions(&dvector![r, r2, r3], &mixture_strengths(ln_k)).1;
+            let h = 1e-9;
+            let fd = (g(r1 + h) - g(r1 - h)) / (2.0 * h);
+            let d = f(Dual64::new(r1, 1.0)).map(|v| v.eps);
+            for i in 0..3 {
+                assert_relative_eq!(d[i], fd[i], max_relative = 1e-6, epsilon = 1e-6);
+            }
+            let rho = dvector![r1, r2, r3];
+            let fl = |l: f64| non_paired_fractions(&rho, &mixture_strengths(l)).1;
+            let fd = (fl(ln_k + 1e-6) - fl(ln_k - 1e-6)) / 2e-6;
+            let d = non_paired_fractions(
+                &rho.map(Dual64::from),
+                &mixture_strengths(Dual64::new(ln_k, 1.0)),
+            )
+            .1
+            .map(|v| v.eps);
+            for i in 0..3 {
+                assert_relative_eq!(d[i], fd[i], max_relative = 1e-6, epsilon = 1e-9);
+            }
+        }
     }
 }

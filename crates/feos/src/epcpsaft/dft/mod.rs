@@ -25,7 +25,7 @@ mod polar;
 use dispersion::AttractiveFunctional;
 use hard_chain::ChainFunctional;
 
-/// ePCP-SAFT Helmholtz energy functional (currently only for systems without ions).
+/// ePCP-SAFT Helmholtz energy functional for systems without ions.
 pub struct EPcpSaftFunctional {
     pub parameters: EPcpSaftParameters,
     params: EPcpSaftPars,

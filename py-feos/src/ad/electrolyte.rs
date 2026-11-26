@@ -122,7 +122,8 @@ impl PyPropertyAD {
     ///     ``[n, n_components]`` (mole-fraction scale; solutes: infinite dilution in the pure
     ///     solvent; solvent: pure solvent) and ``moles`` (equilibrium amounts, mol). The
     ///     derivatives have an additional last axis of length ``len(derivatives)``. Rows that did
-    ///     not converge are NaN.
+    ///     not converge are NaN. The status is True for rows whose calculation returned without
+    ///     error; their values are NaN where an iteration inside the model did not converge.
     #[staticmethod]
     #[pyo3(signature = (parameters, derivatives, input, solvent=0, max_eta=0.5, max_iter_cross_assoc=50, tol_cross_assoc=1e-10, dq_variant="dq35", epcpsaft_variant="dh", msa_packing="ions", born_delta_cation=0.0, born_delta_anion=0.0, born_diameter="hs", dh_delta=0.0, ion_pairing_constant="shell", ion_pairing_shell=1.034, bidh_dipole_factor=0.25, permittivity_offset=vec![], reactions=vec![], solvent_molar_mass=0.018015268))]
     #[expect(clippy::too_many_arguments)]

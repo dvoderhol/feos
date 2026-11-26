@@ -3,7 +3,9 @@ use super::PyEquationOfState;
 use crate::dft::{PyAssociationVersion, PyFMTVersion, PyHelmholtzEnergyFunctional};
 use crate::error::PyFeosError;
 use crate::ideal_gas::IdealGasModel;
-use crate::parameter::{PyParameters, PyParametersOrGcParameters};
+#[cfg(feature = "dft")]
+use crate::parameter::PyParameters;
+use crate::parameter::PyParametersOrGcParameters;
 use crate::residual::ResidualModel;
 use crate::state::PyState;
 #[cfg(feature = "dft")]

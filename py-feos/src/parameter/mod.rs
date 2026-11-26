@@ -1,10 +1,13 @@
 use crate::error::PyFeosError;
 use feos_core::parameter::*;
 use indexmap::IndexSet;
-#[cfg(feature = "pcsaft")]
+#[cfg(any(feature = "pcsaft", feature = "epcpsaft"))]
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-#[cfg(all(feature = "experimental-inspect", feature = "pcsaft"))]
+#[cfg(all(
+    feature = "experimental-inspect",
+    any(feature = "pcsaft", feature = "epcpsaft")
+))]
 use pyo3::type_hint_union;
 use pyo3::types::PyDict;
 use pythonize::depythonize;
@@ -845,13 +848,13 @@ mod test {
 ///
 /// Used by models that can be parametrized with homosegmented group contribution parameters;
 /// add their feature to the `cfg` when using it for another model.
-#[cfg(feature = "pcsaft")]
+#[cfg(any(feature = "pcsaft", feature = "epcpsaft"))]
 pub enum PyParametersOrGcParameters {
     Parameters(PyParameters),
     GcParameters(PyGcParameters),
 }
 
-#[cfg(feature = "pcsaft")]
+#[cfg(any(feature = "pcsaft", feature = "epcpsaft"))]
 impl<'a, 'py> FromPyObject<'a, 'py> for PyParametersOrGcParameters {
     type Error = PyErr;
 

@@ -214,7 +214,8 @@ pub struct EPcpSaftBinaryRecord {
     /// Binary dispersion interaction parameter
     pub k_ij: f64,
     /// Ion pairing of a cation and an anion (variants BiDH and BiMSA): natural logarithm of the factor of the
-    /// association constant (Bjerrum or Ebeling, option `ion_pairing_constant`; 0: the constant itself)
+    /// association constant (contact shell (default), Bjerrum or Ebeling, option `ion_pairing_constant`; 0: the
+    /// constant itself)
     #[serde(default)]
     #[serde(skip_serializing_if = "f64::is_zero")]
     pub ion_pairing: f64,

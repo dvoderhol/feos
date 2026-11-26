@@ -18,7 +18,10 @@ use quantity::*;
 /// are undesirable (e.g. FFI).
 #[cfg_attr(feature = "dft", derive(HelmholtzEnergyFunctionalDyn))]
 #[derive(ResidualDyn, Subset)]
-#[expect(clippy::large_enum_variant)]
+#[cfg_attr(
+    not(all(feature = "dft", feature = "epcpsaft")),
+    expect(clippy::large_enum_variant)
+)]
 pub enum ResidualModel {
     // Equations of state
     NoResidual(NoResidual),
