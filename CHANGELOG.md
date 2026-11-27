@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Added `RegionMeanField`, a mean-field interaction $\frac{1}{2}\sum_{kl}W_{kl}N_kN_l$ between the molecules in disjoint regions of the grid, in the Euler-Lagrange equation and the grand potential; optional argument `mean_field` of `PoreProfile` and of the `Adsorption` isotherms and phase equilibrium.
+- Added `feos-mlip`, a Python package with external potentials from machine-learned interatomic potentials for cDFT in periodic frameworks.
 
 ## [0.11.0](https://github.com/feos-org/feos/releases/tag/v0.11.0) - 2026-11-18
 ### Added

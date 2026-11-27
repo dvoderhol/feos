@@ -38,6 +38,7 @@ Implementations of Helmholtz energy functionals for DFT.
     Pore1D
     PoreProfile
     PoreSpecification
+    RegionMeanField
     Adsorption
 ```
 

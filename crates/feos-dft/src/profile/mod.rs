@@ -3,7 +3,7 @@ use crate::convolver::Convolver;
 use crate::functional::HelmholtzEnergyFunctional;
 use crate::geometry::Grid;
 use crate::solver::{DFTSolver, DFTSolverLog};
-use feos_core::{FeosResult, ReferenceSystem, State};
+use feos_core::{FeosError, FeosResult, ReferenceSystem, State};
 use nalgebra::{DVector, Dyn, U1};
 use ndarray::{Array, Array1, ArrayBase, Axis as Axis_nd, Data, Dimension, Ix0, IxDyn};
 use num_dual::DualNum;
@@ -11,7 +11,10 @@ use quantity::{_Volume, Density, Energy, Entropy, Length, Moles, Quantity, Tempe
 use std::ops::{Add, MulAssign};
 use std::sync::Arc;
 
+mod mean_field;
 mod properties;
+pub use mean_field::RegionMeanField;
+pub(crate) use mean_field::ReducedRegionMeanField;
 
 pub(crate) const MAX_POTENTIAL: f64 = 50.0;
 
@@ -72,6 +75,7 @@ pub struct DFTProfile<D: Dimension, F> {
     pub association_convolver: Option<Arc<dyn Convolver<f64, D>>>,
     pub association_kernel_convolver: Option<Arc<dyn Convolver<f64, D>>>,
     pub solver_log: DFTSolverLog,
+    pub(crate) mean_field: Option<ReducedRegionMeanField<D>>,
 }
 
 impl<D: Dimension, F> DFTProfile<D, F> {
@@ -187,6 +191,7 @@ where
             association_convolver,
             association_kernel_convolver,
             solver_log: DFTSolverLog::new(),
+            mean_field: None,
         }
     }
 
@@ -227,6 +232,7 @@ where
             association_convolver,
             association_kernel_convolver,
             solver_log: self.solver_log,
+            mean_field: self.mean_field.map(ReducedRegionMeanField::into_dyn),
         }
     }
 
@@ -249,6 +255,18 @@ where
             unreachable!()
         };
         self.specification = DFTSpecification::TotalMoles(moles, ln_fugacity);
+    }
+
+    /// Add the [RegionMeanField] `mean_field` to the Euler-Lagrange equation and the grand
+    /// potential (only for molecules with one segment).
+    pub fn set_mean_field(&mut self, mean_field: &RegionMeanField<D>) -> FeosResult<()> {
+        if self.functional.m().iter().any(|&m| m != 1.0) {
+            return Err(FeosError::Error(
+                "RegionMeanField is only implemented for molecules with one segment (m = 1).".into(),
+            ));
+        }
+        self.mean_field = Some(mean_field.reduce(&self.grid, self.temperature)?);
+        Ok(())
     }
 
     /// Return the external potential in SI units.

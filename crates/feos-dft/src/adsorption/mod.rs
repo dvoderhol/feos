@@ -1,6 +1,7 @@
 //! Adsorption profiles and isotherms.
 use super::functional::HelmholtzEnergyFunctional;
 use super::geometry::Grid;
+use super::profile::RegionMeanField;
 use super::solver::DFTSolver;
 use feos_core::DensityInitialization::{Liquid, Vapor};
 use feos_core::{
@@ -46,12 +47,14 @@ where
     }
 
     /// Calculate an adsorption isotherm (starting at low pressure)
+    #[expect(clippy::too_many_arguments)]
     pub fn adsorption_isotherm<X: Composition<f64, Dyn> + Clone>(
         functional: &F,
         temperature: Temperature,
         pressure: &Pressure<Array1<f64>>,
         grid: &Grid,
         external_potential: &Energy<Array<f64, D::Larger>>,
+        mean_field: Option<&RegionMeanField<D>>,
         composition: X,
         solver: Option<&DFTSolver>,
     ) -> FeosResult<Adsorption<D, F>> {
@@ -61,6 +64,7 @@ where
             pressure,
             grid,
             external_potential,
+            mean_field,
             composition,
             DensityInitialization::Vapor,
             solver,
@@ -68,12 +72,14 @@ where
     }
 
     /// Calculate an desorption isotherm (starting at high pressure)
+    #[expect(clippy::too_many_arguments)]
     pub fn desorption_isotherm<X: Composition<f64, Dyn> + Clone>(
         functional: &F,
         temperature: Temperature,
         pressure: &Pressure<Array1<f64>>,
         grid: &Grid,
         external_potential: &Energy<Array<f64, D::Larger>>,
+        mean_field: Option<&RegionMeanField<D>>,
         composition: X,
         solver: Option<&DFTSolver>,
     ) -> FeosResult<Adsorption<D, F>> {
@@ -84,6 +90,7 @@ where
             &pressure,
             grid,
             external_potential,
+            mean_field,
             composition,
             DensityInitialization::Liquid,
             solver,
@@ -95,12 +102,14 @@ where
     }
 
     /// Calculate an equilibrium isotherm
+    #[expect(clippy::too_many_arguments)]
     pub fn equilibrium_isotherm<X: Composition<f64, Dyn> + Clone>(
         functional: &F,
         temperature: Temperature,
         pressure: &Pressure<Array1<f64>>,
         grid: &Grid,
         external_potential: &Energy<Array<f64, D::Larger>>,
+        mean_field: Option<&RegionMeanField<D>>,
         composition: X,
         solver: Option<&DFTSolver>,
     ) -> FeosResult<Adsorption<D, F>> {
@@ -112,6 +121,7 @@ where
             p_max,
             grid,
             external_potential,
+            mean_field,
             composition.clone(),
             solver,
             SolverOptions::default(),
@@ -132,6 +142,7 @@ where
                 &p_ads,
                 grid,
                 external_potential,
+                mean_field,
                 composition.clone(),
                 solver,
             )?
@@ -142,6 +153,7 @@ where
                 &p_des,
                 grid,
                 external_potential,
+                mean_field,
                 composition,
                 solver,
             )?
@@ -157,6 +169,7 @@ where
                 pressure,
                 grid,
                 external_potential,
+                mean_field,
                 composition.clone(),
                 solver,
             )?;
@@ -166,6 +179,7 @@ where
                 pressure,
                 grid,
                 external_potential,
+                mean_field,
                 composition,
                 solver,
             )?;
@@ -191,6 +205,7 @@ where
         pressure: &Pressure<Array1<f64>>,
         grid: &Grid,
         external_potential: &Energy<Array<f64, D::Larger>>,
+        mean_field: Option<&RegionMeanField<D>>,
         composition: X,
         density_initialization: DensityInitialization,
         solver: Option<&DFTSolver>,
@@ -222,6 +237,7 @@ where
                 None,
                 PoreSpecification::ChemicalPotential,
             )
+            .with_mean_field(mean_field)?
             .solve(solver)?,
         );
 
@@ -250,9 +266,13 @@ where
                     None,
                     PoreSpecification::ChemicalPotential,
                 )
+                .with_mean_field(mean_field)
             };
-            let p = old_profile.map_or_else(new_profile, |p| p.update_bulk(&bulk));
-            profiles.push(p.solve(solver).or_else(|_| new_profile().solve(solver)));
+            let p = old_profile.map_or_else(new_profile, |p| Ok(p.update_bulk(&bulk)));
+            profiles.push(
+                p.and_then(|p| p.solve(solver))
+                    .or_else(|_| new_profile().and_then(|p| p.solve(solver))),
+            );
 
             old_profile = profiles.last().and_then(|p| p.as_ref().ok()).cloned();
         }
@@ -269,6 +289,7 @@ where
         p_max: Pressure,
         grid: &Grid,
         external_potential: &Energy<Array<f64, D::Larger>>,
+        mean_field: Option<&RegionMeanField<D>>,
         composition: X,
         solver: Option<&DFTSolver>,
         options: SolverOptions,
@@ -286,6 +307,7 @@ where
             None,
             PoreSpecification::ChemicalPotential,
         )
+        .with_mean_field(mean_field)?
         .solve(solver)?;
         let mut liquid = PoreProfile::new(
             grid.clone(),
@@ -294,6 +316,7 @@ where
             None,
             PoreSpecification::ChemicalPotential,
         )
+        .with_mean_field(mean_field)?
         .solve(solver)?;
 
         // calculate initial value for bulk density

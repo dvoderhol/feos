@@ -51,6 +51,12 @@ where
             f += &(&rho.index_axis(Axis(0), segment.index()) * (0.5 * n as f64));
         }
 
+        // region mean field: the Euler-Lagrange equation contains v, the grand potential 1/2 v
+        if let Some(mean_field) = &self.mean_field {
+            let rho_tot = rho.sum_axis(Axis(0));
+            f -= &(&mean_field.potential(rho_tot.view(), 1.0) * &rho_tot * 0.5);
+        }
+
         Ok(Pressure::from_reduced(f * t))
     }
 
@@ -223,8 +229,13 @@ where
         let density = self.density.to_reduced();
         let helmholtz_energy_density =
             self.helmholtz_energy_density(temperature_dual, contributions)?;
-        let internal_energy_density = helmholtz_energy_density.mapv(|f| f.re - f.eps * temperature)
-            + (&self.external_potential * density).sum_axis(Axis(0)) * temperature;
+        let mut internal_energy_density = helmholtz_energy_density.mapv(|f| f.re - f.eps * temperature)
+            + (&self.external_potential * &density).sum_axis(Axis(0)) * temperature;
+        if let Some(mean_field) = &self.mean_field {
+            let rho_tot = density.sum_axis(Axis(0));
+            internal_energy_density +=
+                &(&mean_field.potential(rho_tot.view(), 1.0) * &rho_tot * (0.5 * temperature));
+        }
         Ok(Pressure::from_reduced(internal_energy_density))
     }
 

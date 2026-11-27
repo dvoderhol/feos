@@ -19,6 +19,7 @@ mod solver;
 
 pub(crate) use adsorption::{
     PyAdsorption, PyExternalPotential, PyGrid, PyPore1D, PyPoreProfile, PyPoreSpecification,
+    PyRegionMeanField,
 };
 pub(crate) use interface::{PyInterface, PySurfaceTensionDiagram};
 pub(crate) use solvation::PyPairCorrelation;

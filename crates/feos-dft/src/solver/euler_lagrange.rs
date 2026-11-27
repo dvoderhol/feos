@@ -214,6 +214,12 @@ where
         // external potential (beta V, scaled from the temperature of the profile) and chain length
         let ratio = N::from(self.temperature.to_reduced()) / t;
         dfdrho += &tape.constant(self.external_potential.mapv(|v| ratio * v));
+        if let Some(mean_field) = &self.mean_field {
+            let v = mean_field.potential(rho.sum_axis(Axis(0)).view(), ratio);
+            for mut df in dfdrho.outer_iter_mut() {
+                df += &v;
+            }
+        }
         for (mut df, &m) in dfdrho.outer_iter_mut().zip(self.functional.m().iter()) {
             df.mapv_inplace(|df| df / m);
         }

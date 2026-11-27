@@ -9,11 +9,13 @@ use feos_core::parameter::IdentifierOption;
 use feos_core::{
     Contributions, EquationOfState, FeosResult, PhaseEquilibrium, ReferenceSystem, State,
 };
-use feos_dft::adsorption::{ExternalPotential, Pore1D, PoreSpecification};
+use feos_dft::adsorption::{ExternalPotential, Pore1D, PoreProfile, PoreSpecification};
 use feos_dft::interface::Interface;
-use feos_dft::{AssociationFunctional, DFTSolver, Geometry, HelmholtzEnergyFunctional};
+use feos_dft::{
+    AssociationFunctional, DFTSolver, Geometry, HelmholtzEnergyFunctional, RegionMeanField,
+};
 use nalgebra::dvector;
-use ndarray::Axis;
+use ndarray::{Array1, Axis, arr2};
 use quantity::*;
 use std::error::Error;
 
@@ -405,5 +407,79 @@ fn test_association_functional() -> Result<(), Box<dyn Error>> {
             }
         }
     }
+    Ok(())
+}
+
+#[test]
+fn test_region_mean_field() -> Result<(), Box<dyn Error>> {
+    // methane (m = 1) in a slit pore, two regions (wall layer and next layer) with attractive and
+    // repulsive couplings; checks: zero coupling gives the profile without mean field, the grand
+    // potential satisfies dOmega/dmu = -N (Gibbs adsorption equation), and an attractive coupling
+    // increases the adsorption
+    let func = &PcSaftFunctional::new(parameters("methane")?);
+    let temperature = 200.0 * KELVIN;
+    let n_grid = 512;
+    let pore = Pore1D::new(
+        &func,
+        Geometry::Cartesian,
+        20.0 * ANGSTROM,
+        ExternalPotential::LJ93 {
+            sigma_ss: 3.0,
+            epsilon_k_ss: 100.0,
+            rho_s: 0.08,
+        },
+        Some(n_grid),
+    );
+    let regions = Array1::from_shape_fn(n_grid, |i| match i {
+        i if i < n_grid / 8 => 0,
+        i if i < n_grid / 4 => 1,
+        _ => -1,
+    });
+    let kt = (KB * temperature).to_reduced();
+    let solve = |p: Pressure, coupling: [[f64; 2]; 2]| -> FeosResult<_> {
+        let bulk = State::new_npt(&func, temperature, p, (), None)?;
+        let coupling = Energy::from_reduced(arr2(&coupling) * kt);
+        let mean_field = RegionMeanField::new(regions.clone(), coupling)?;
+        let profile = PoreProfile::new(
+            pore.grid.clone(),
+            &bulk,
+            &pore.external_potential,
+            None,
+            PoreSpecification::ChemicalPotential,
+        )
+        .with_mean_field(Some(&mean_field))?
+        .solve(None)?;
+        let mu = bulk.residual_chemical_potential().get(0)
+            + RGAS * temperature * bulk.density.to_reduced().ln();
+        Ok((profile, mu))
+    };
+    let p = 5.0 * BAR;
+
+    let plain = pore
+        .initialize(
+            &State::new_npt(&func, temperature, p, (), None)?,
+            None,
+            PoreSpecification::ChemicalPotential,
+        )?
+        .solve(None)?;
+    let (zero, _) = solve(p, [[0.0, 0.0], [0.0, 0.0]])?;
+    assert_relative_eq!(
+        zero.profile.total_moles(),
+        plain.profile.total_moles(),
+        max_relative = 1e-10
+    );
+    assert_relative_eq!(
+        zero.grand_potential.unwrap(),
+        plain.grand_potential.unwrap(),
+        max_relative = 1e-10
+    );
+
+    let coupling = [[-2.0, 0.5], [0.5, -1.0]];
+    let (profile, _) = solve(p, coupling)?;
+    let (profile_m, mu_m) = solve(p * (1.0 - 1e-4), coupling)?;
+    let (profile_p, mu_p) = solve(p * (1.0 + 1e-4), coupling)?;
+    let dn = -(profile_p.grand_potential.unwrap() - profile_m.grand_potential.unwrap()) / (mu_p - mu_m);
+    assert_relative_eq!(dn, profile.profile.total_moles(), max_relative = 1e-6);
+    assert!(profile.profile.total_moles() > plain.profile.total_moles());
     Ok(())
 }

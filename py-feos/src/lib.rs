@@ -195,6 +195,6 @@ mod feos {
     use super::dft::{
         PyAdsorption, PyDFTSolver, PyDFTSolverLog, PyExternalPotential, PyFMTVersion, PyGeometry,
         PyGrid, PyHelmholtzEnergyFunctional, PyInterface, PyPairCorrelation, PyPore1D,
-        PyPoreProfile, PyPoreSpecification, PySurfaceTensionDiagram,
+        PyPoreProfile, PyPoreSpecification, PyRegionMeanField, PySurfaceTensionDiagram,
     };
 }

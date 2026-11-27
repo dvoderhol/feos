@@ -17,7 +17,7 @@ mod external_potential;
 mod pore;
 
 pub use external_potential::PyExternalPotential;
-pub use pore::{PyGrid, PyPore1D, PyPoreProfile, PyPoreSpecification};
+pub use pore::{PyGrid, PyPore1D, PyPoreProfile, PyPoreSpecification, PyRegionMeanField};
 
 /// Container structure for adsorption isotherms.
 #[pyclass(name = "Adsorption")]
@@ -45,13 +45,16 @@ impl PyAdsorption {
     ///     The composition of the mixture.
     /// solver: DFTSolver, optional
     ///     Custom solver options.
+    /// mean_field : RegionMeanField, optional
+    ///     Mean-field interaction between the molecules in regions of the grid.
     ///
     /// Returns
     /// -------
     /// Adsorption
     ///
     #[staticmethod]
-    #[pyo3(signature = (functional, temperature, pressure, grid, external_potential, composition=None, solver=None))]
+    #[pyo3(signature = (functional, temperature, pressure, grid, external_potential, composition=None, solver=None, mean_field=None))]
+    #[expect(clippy::too_many_arguments)]
     fn adsorption_isotherm(
         functional: &PyEquationOfState,
         temperature: Temperature,
@@ -60,6 +63,7 @@ impl PyAdsorption {
         external_potential: Energy<ArrayD<f64>>,
         composition: Option<PyComposition>,
         solver: Option<PyDFTSolver>,
+        mean_field: Option<PyRegionMeanField>,
     ) -> PyResult<Self> {
         Ok(Self(
             Adsorption::adsorption_isotherm(
@@ -68,6 +72,7 @@ impl PyAdsorption {
                 &pressure,
                 &grid.0,
                 &external_potential,
+                mean_field.as_ref().map(|m| &m.0),
                 composition.unwrap_or_default(),
                 solver.map(|s| s.0).as_ref(),
             )
@@ -95,13 +100,16 @@ impl PyAdsorption {
     ///     The composition of the mixture.
     /// solver: DFTSolver, optional
     ///     Custom solver options.
+    /// mean_field : RegionMeanField, optional
+    ///     Mean-field interaction between the molecules in regions of the grid.
     ///
     /// Returns
     /// -------
     /// Adsorption
     ///
     #[staticmethod]
-    #[pyo3(signature = (functional, temperature, pressure, grid, external_potential, composition=None, solver=None))]
+    #[pyo3(signature = (functional, temperature, pressure, grid, external_potential, composition=None, solver=None, mean_field=None))]
+    #[expect(clippy::too_many_arguments)]
     fn desorption_isotherm(
         functional: &PyEquationOfState,
         temperature: Temperature,
@@ -110,6 +118,7 @@ impl PyAdsorption {
         external_potential: Energy<ArrayD<f64>>,
         composition: Option<PyComposition>,
         solver: Option<PyDFTSolver>,
+        mean_field: Option<PyRegionMeanField>,
     ) -> PyResult<Self> {
         Ok(Self(
             Adsorption::desorption_isotherm(
@@ -118,6 +127,7 @@ impl PyAdsorption {
                 &pressure,
                 &grid.0,
                 &external_potential,
+                mean_field.as_ref().map(|m| &m.0),
                 composition.unwrap_or_default(),
                 solver.map(|s| s.0).as_ref(),
             )
@@ -148,13 +158,16 @@ impl PyAdsorption {
     ///     The composition of the mixture.
     /// solver: DFTSolver, optional
     ///     Custom solver options.
+    /// mean_field : RegionMeanField, optional
+    ///     Mean-field interaction between the molecules in regions of the grid.
     ///
     /// Returns
     /// -------
     /// Adsorption
     ///
     #[staticmethod]
-    #[pyo3(signature = (functional, temperature, pressure, grid, external_potential, composition=None, solver=None))]
+    #[pyo3(signature = (functional, temperature, pressure, grid, external_potential, composition=None, solver=None, mean_field=None))]
+    #[expect(clippy::too_many_arguments)]
     fn equilibrium_isotherm(
         functional: &PyEquationOfState,
         temperature: Temperature,
@@ -163,6 +176,7 @@ impl PyAdsorption {
         external_potential: Energy<ArrayD<f64>>,
         composition: Option<PyComposition>,
         solver: Option<PyDFTSolver>,
+        mean_field: Option<PyRegionMeanField>,
     ) -> PyResult<Self> {
         Ok(Self(
             Adsorption::equilibrium_isotherm(
@@ -171,6 +185,7 @@ impl PyAdsorption {
                 &pressure,
                 &grid.0,
                 &external_potential,
+                mean_field.as_ref().map(|m| &m.0),
                 composition.unwrap_or_default(),
                 solver.map(|s| s.0).as_ref(),
             )
@@ -204,13 +219,15 @@ impl PyAdsorption {
     ///     The tolerance of the phase equilibrium calculation.
     /// verbosity: Verbosity, optional
     ///     The verbosity of the phase equilibrium calculation.
+    /// mean_field : RegionMeanField, optional
+    ///     Mean-field interaction between the molecules in regions of the grid.
     ///
     /// Returns
     /// -------
     /// Adsorption
     ///
     #[staticmethod]
-    #[pyo3(signature = (functional, temperature, p_min, p_max, grid, external_potential, composition=None, solver=None, max_iter=None, tol=None, verbosity=None))]
+    #[pyo3(signature = (functional, temperature, p_min, p_max, grid, external_potential, composition=None, solver=None, max_iter=None, tol=None, verbosity=None, mean_field=None))]
     #[expect(clippy::too_many_arguments)]
     fn phase_equilibrium(
         functional: &PyEquationOfState,
@@ -224,6 +241,7 @@ impl PyAdsorption {
         max_iter: Option<usize>,
         tol: Option<f64>,
         verbosity: Option<PyVerbosity>,
+        mean_field: Option<PyRegionMeanField>,
     ) -> PyResult<Self> {
         Ok(Self(
             Adsorption::phase_equilibrium(
@@ -233,6 +251,7 @@ impl PyAdsorption {
                 p_max,
                 &grid.0,
                 &external_potential,
+                mean_field.as_ref().map(|m| &m.0),
                 composition.unwrap_or_default(),
                 solver.map(|s| s.0).as_ref(),
                 (max_iter, tol, verbosity.map(|v| v.into())).into(),

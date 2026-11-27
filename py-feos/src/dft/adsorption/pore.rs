@@ -7,7 +7,7 @@ use crate::ideal_gas::IdealGasModel;
 use crate::residual::ResidualModel;
 use crate::state::{PyContributions, PyState};
 use feos_core::{EquationOfState, ReferenceSystem};
-use feos_dft::{Axis as AxisDFT, Grid, adsorption::*};
+use feos_dft::{Axis as AxisDFT, Grid, RegionMeanField, adsorption::*};
 use nalgebra::{DMatrix, DVector};
 use ndarray::*;
 use numpy::*;
@@ -116,6 +116,43 @@ impl PyGrid {
     }
 }
 
+/// Mean-field interaction between the molecules in disjoint regions of the grid,
+/// F_mf = 1/2 sum_kl W_kl N_k N_l, with N_k the number of molecules (of all components) in
+/// region k. A molecule in region k feels the potential v_k = sum_l W_kl N_l. The term enters
+/// the Euler-Lagrange equation and the grand potential and does not depend on temperature.
+/// Only for molecules with one segment (m = 1).
+///
+/// Parameters
+/// ----------
+/// regions : numpy.ndarray[int]
+///     Region of every grid point (shape of the grid); negative values: no region.
+/// coupling : SIArray2
+///     Symmetric interaction energies W_kl.
+///
+/// Returns
+/// -------
+/// RegionMeanField
+///
+#[pyclass(name = "RegionMeanField", from_py_object)]
+#[derive(Clone)]
+pub struct PyRegionMeanField(pub RegionMeanField<IxDyn>);
+
+#[pymethods]
+impl PyRegionMeanField {
+    #[new]
+    fn new(regions: PyReadonlyArrayDyn<i64>, coupling: Energy<ArrayD<f64>>) -> PyResult<Self> {
+        let regions = regions.as_array().mapv(|k| k as isize);
+        let coupling = coupling
+            .to_reduced()
+            .into_dimensionality::<Ix2>()
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("coupling: {e}")))?;
+        Ok(Self(
+            RegionMeanField::new(regions, Energy::from_reduced(coupling))
+                .map_err(PyFeosError::from)?,
+        ))
+    }
+}
+
 /// The base class for studying adsorption phenomena.
 ///
 /// Parameters
@@ -131,6 +168,8 @@ impl PyGrid {
 /// specification : PoreSpecification
 ///     The external constraint that specifies the state
 ///     in the pore.
+/// mean_field : RegionMeanField, optional
+///     Mean-field interaction between the molecules in regions of the grid.
 ///
 /// Returns
 /// -------
@@ -144,20 +183,25 @@ pub struct PyPoreProfile(
 #[pymethods]
 impl PyPoreProfile {
     #[new]
-    #[pyo3(signature = (grid, bulk, external_potential, density=None, specification=PyPoreSpecification::ChemicalPotential()))]
+    #[pyo3(signature = (grid, bulk, external_potential, density=None, specification=PyPoreSpecification::ChemicalPotential(), mean_field=None))]
     fn new(
         grid: PyGrid,
         bulk: &PyState,
         external_potential: Energy<ArrayD<f64>>,
         density: Option<Density<ArrayD<f64>>>,
         specification: PyPoreSpecification,
-    ) -> Self {
-        Self(PoreProfile::new(
-            grid.0,
-            &bulk.0,
-            &external_potential,
-            density.as_ref(),
-            specification.0,
+        mean_field: Option<PyRegionMeanField>,
+    ) -> PyResult<Self> {
+        Ok(Self(
+            PoreProfile::new(
+                grid.0,
+                &bulk.0,
+                &external_potential,
+                density.as_ref(),
+                specification.0,
+            )
+            .with_mean_field(mean_field.as_ref().map(|m| &m.0))
+            .map_err(PyFeosError::from)?,
         ))
     }
 

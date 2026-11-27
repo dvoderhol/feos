@@ -3,7 +3,7 @@ use crate::convolver::ConvolverFFT;
 use crate::functional::{HelmholtzEnergyFunctional, HelmholtzEnergyFunctionalDyn, MoleculeShape};
 use crate::functional_contribution::FunctionalContribution;
 use crate::geometry::{Axis, Geometry, Grid};
-use crate::profile::{DFTProfile, InitialDensity};
+use crate::profile::{DFTProfile, InitialDensity, RegionMeanField};
 use crate::solver::DFTSolver;
 use crate::{DFTSpecification, NoAssociation, WeightFunctionInfo};
 use feos_core::{Contributions, FeosResult, ReferenceSystem, ResidualDyn, State, StateHD};
@@ -152,6 +152,14 @@ where
             grand_potential: None,
             interfacial_tension: None,
         }
+    }
+
+    /// Add a [RegionMeanField] (if `mean_field` is `Some`) to the profile.
+    pub fn with_mean_field(mut self, mean_field: Option<&RegionMeanField<D>>) -> FeosResult<Self> {
+        if let Some(mean_field) = mean_field {
+            self.profile.set_mean_field(mean_field)?;
+        }
+        Ok(self)
     }
 
     pub fn solve_inplace(&mut self, solver: Option<&DFTSolver>, debug: bool) -> FeosResult<()> {
